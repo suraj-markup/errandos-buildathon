@@ -1,6 +1,7 @@
 package ai.errandos.overlay;
 
 import android.Manifest;
+import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -19,15 +20,20 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
-import android.widget.ImageButton;
 import android.util.Base64;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import org.json.JSONObject;
 
@@ -47,19 +53,35 @@ public final class OverlayService extends Service {
     public static final String ACTION_STATUS = "ai.errandos.overlay.STATUS";
     private static final String CHANNEL_ID = "errandos_overlay";
     private static final int NOTIFICATION_ID = 73;
+    private static final int COLLAPSED_SIZE_DP = 64;
+    private static final int EXPANDED_WIDTH_DP = 292;
+    private static final long HOLD_DELAY_MS = 260;
+    private static final long AUTO_COLLAPSE_MS = 6500;
     private static final String VOICE_TURN_URL =
         "http://127.0.0.1:3100/api/voice/turn";
 
     private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
-    private ImageButton statusView;
+    private LinearLayout statusView;
+    private ImageView iconView;
+    private TextView statusLabel;
     private BroadcastReceiver receiver;
     private MediaRecorder recorder;
     private MediaPlayer player;
     private File recordingFile;
     private boolean recording;
     private volatile boolean uploading;
+    private boolean expanded;
+    private ValueAnimator widthAnimator;
+    private String latestMessage = "Hold to speak";
+    private final Runnable collapseRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!recording && !uploading) setExpanded(false, true);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -101,6 +123,8 @@ public final class OverlayService extends Service {
         releaseRecorder();
         releasePlayer();
         networkExecutor.shutdownNow();
+        mainHandler.removeCallbacksAndMessages(null);
+        if (widthAnimator != null) widthAnimator.cancel();
         if (windowManager != null && statusView != null) {
             windowManager.removeView(statusView);
         }
@@ -135,18 +159,41 @@ public final class OverlayService extends Service {
 
     private void createOverlay() {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        statusView = new ImageButton(this);
-        statusView.setImageResource(android.R.drawable.ic_btn_speak_now);
-        statusView.setColorFilter(Color.WHITE);
+        statusView = new LinearLayout(this);
+        statusView.setOrientation(LinearLayout.HORIZONTAL);
+        statusView.setGravity(Gravity.CENTER_VERTICAL);
         statusView.setContentDescription("JaldiAI. Press and hold to speak.");
-        statusView.setPadding(dp(17), dp(17), dp(17), dp(17));
-        statusView.setScaleType(ImageButton.ScaleType.FIT_CENTER);
         statusView.setBackground(backgroundFor("ready"));
         statusView.setElevation(dp(10));
 
+        iconView = new ImageView(this);
+        iconView.setImageResource(android.R.drawable.ic_btn_speak_now);
+        iconView.setColorFilter(Color.WHITE);
+        iconView.setPadding(dp(17), dp(17), dp(17), dp(17));
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        statusView.addView(
+            iconView,
+            new LinearLayout.LayoutParams(dp(COLLAPSED_SIZE_DP), dp(COLLAPSED_SIZE_DP))
+        );
+
+        statusLabel = new TextView(this);
+        statusLabel.setText(latestMessage);
+        statusLabel.setTextColor(Color.WHITE);
+        statusLabel.setTextSize(14f);
+        statusLabel.setMaxLines(2);
+        statusLabel.setGravity(Gravity.CENTER_VERTICAL);
+        statusLabel.setPadding(0, 0, dp(18), 0);
+        statusLabel.setVisibility(View.INVISIBLE);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+            0,
+            dp(COLLAPSED_SIZE_DP),
+            1f
+        );
+        statusView.addView(statusLabel, labelParams);
+
         layoutParams = new WindowManager.LayoutParams(
-            dp(64),
-            dp(64),
+            dp(COLLAPSED_SIZE_DP),
+            dp(COLLAPSED_SIZE_DP),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -154,8 +201,12 @@ public final class OverlayService extends Service {
             PixelFormat.TRANSLUCENT
         );
         layoutParams.gravity = Gravity.TOP | Gravity.START;
-        layoutParams.x = getResources().getDisplayMetrics().widthPixels - dp(80);
-        layoutParams.y = dp(76);
+        int savedX = getSharedPreferences("overlay", MODE_PRIVATE).getInt("x", -1);
+        int savedY = getSharedPreferences("overlay", MODE_PRIVATE).getInt("y", dp(76));
+        layoutParams.x = savedX >= 0
+            ? savedX
+            : getResources().getDisplayMetrics().widthPixels - dp(80);
+        layoutParams.y = savedY;
 
         installTouchBehavior();
         windowManager.addView(statusView, layoutParams);
@@ -163,17 +214,65 @@ public final class OverlayService extends Service {
 
     private void installTouchBehavior() {
         statusView.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View view, MotionEvent event) {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    view.setPressed(true);
-                    view.setScaleX(0.92f);
-                    view.setScaleY(0.92f);
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
+            private float downRawX;
+            private float downRawY;
+            private int downWindowX;
+            private int downWindowY;
+            private boolean dragging;
+            private boolean holdStarted;
+            private final int touchSlop = ViewConfiguration
+                .get(OverlayService.this)
+                .getScaledTouchSlop();
+            private final Runnable beginHold = new Runnable() {
+                @Override
+                public void run() {
+                    if (dragging) return;
+                    holdStarted = true;
+                    statusView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                     if (uploading) {
                         setStatus("Still working on your last request.", "working");
                     } else if (!recording) {
                         startRecording();
+                    }
+                }
+            };
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    downRawX = event.getRawX();
+                    downRawY = event.getRawY();
+                    downWindowX = layoutParams.x;
+                    downWindowY = layoutParams.y;
+                    dragging = false;
+                    holdStarted = false;
+                    view.setPressed(true);
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
+                    mainHandler.postDelayed(beginHold, HOLD_DELAY_MS);
+                    return true;
+                }
+                if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                    float deltaX = event.getRawX() - downRawX;
+                    float deltaY = event.getRawY() - downRawY;
+                    if (
+                        !holdStarted
+                            && !dragging
+                            && Math.hypot(deltaX, deltaY) > touchSlop
+                    ) {
+                        dragging = true;
+                        mainHandler.removeCallbacks(beginHold);
+                        if (expanded) setExpanded(false, false);
+                        downWindowX = layoutParams.x;
+                        downWindowY = layoutParams.y;
+                        downRawX = event.getRawX();
+                        downRawY = event.getRawY();
+                        deltaX = 0;
+                        deltaY = 0;
+                    }
+                    if (dragging) {
+                        layoutParams.x = clampX(downWindowX + Math.round(deltaX));
+                        layoutParams.y = clampY(downWindowY + Math.round(deltaY));
+                        windowManager.updateViewLayout(statusView, layoutParams);
                     }
                     return true;
                 }
@@ -181,11 +280,17 @@ public final class OverlayService extends Service {
                     event.getAction() == MotionEvent.ACTION_UP
                         || event.getAction() == MotionEvent.ACTION_CANCEL
                 ) {
+                    mainHandler.removeCallbacks(beginHold);
                     view.setPressed(false);
-                    view.setScaleX(1f);
-                    view.setScaleY(1f);
-                    if (event.getAction() == MotionEvent.ACTION_UP) view.performClick();
                     if (recording) stopRecording();
+                    else if (dragging) savePosition();
+                    else if (
+                        event.getAction() == MotionEvent.ACTION_UP
+                            && !holdStarted
+                    ) {
+                        view.performClick();
+                        setExpanded(!expanded, true);
+                    }
                     return true;
                 }
                 return true;
@@ -356,25 +461,108 @@ public final class OverlayService extends Service {
     }
 
     private void setStatus(String message, String state) {
+        latestMessage = message;
         statusView.setContentDescription("JaldiAI. " + message);
         if (Build.VERSION.SDK_INT >= 26) statusView.setTooltipText(message);
-        statusView.setImageResource(iconFor(state));
+        statusLabel.setText(message);
+        iconView.setImageResource(iconFor(state));
         statusView.setBackground(backgroundFor(state));
-        statusView.animate().cancel();
+        iconView.animate().cancel();
         if (
             "working".equals(state)
                 || "searching".equals(state)
                 || "adding".equals(state)
                 || "checkout".equals(state)
         ) {
-            statusView.animate()
+            iconView.animate()
                 .rotationBy(360f)
                 .setDuration(650)
                 .setInterpolator(new AccelerateDecelerateInterpolator())
                 .start();
         } else {
-            statusView.setRotation(0f);
+            iconView.setRotation(0f);
         }
+        setExpanded(true, true);
+        mainHandler.removeCallbacks(collapseRunnable);
+        if (
+            !"listening".equals(state)
+                && !"working".equals(state)
+                && !"searching".equals(state)
+                && !"adding".equals(state)
+                && !"checkout".equals(state)
+        ) {
+            mainHandler.postDelayed(collapseRunnable, AUTO_COLLAPSE_MS);
+        }
+    }
+
+    private void setExpanded(boolean shouldExpand, boolean animate) {
+        if (statusView == null || layoutParams == null) return;
+        mainHandler.removeCallbacks(collapseRunnable);
+        expanded = shouldExpand;
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int targetWidth = shouldExpand
+            ? Math.min(dp(EXPANDED_WIDTH_DP), screenWidth - dp(24))
+            : dp(COLLAPSED_SIZE_DP);
+        int startingWidth = layoutParams.width;
+        if (startingWidth == targetWidth) {
+            statusLabel.setVisibility(shouldExpand ? View.VISIBLE : View.INVISIBLE);
+            return;
+        }
+
+        if (widthAnimator != null) widthAnimator.cancel();
+        final int startingRight = layoutParams.x + startingWidth;
+        final boolean anchoredRight = startingRight > screenWidth / 2;
+        if (shouldExpand) statusLabel.setVisibility(View.VISIBLE);
+
+        if (!animate) {
+            layoutParams.width = targetWidth;
+            if (anchoredRight) layoutParams.x = startingRight - targetWidth;
+            layoutParams.x = clampX(layoutParams.x);
+            windowManager.updateViewLayout(statusView, layoutParams);
+            if (!shouldExpand) statusLabel.setVisibility(View.INVISIBLE);
+            return;
+        }
+
+        widthAnimator = ValueAnimator.ofInt(startingWidth, targetWidth);
+        widthAnimator.setDuration(180);
+        widthAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        widthAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                layoutParams.width = (Integer) animation.getAnimatedValue();
+                if (anchoredRight) layoutParams.x = startingRight - layoutParams.width;
+                layoutParams.x = clampX(layoutParams.x);
+                windowManager.updateViewLayout(statusView, layoutParams);
+                if (!expanded && layoutParams.width == dp(COLLAPSED_SIZE_DP)) {
+                    statusLabel.setVisibility(View.INVISIBLE);
+                }
+            }
+        });
+        widthAnimator.start();
+    }
+
+    private int clampX(int x) {
+        int margin = dp(8);
+        int maximum = getResources().getDisplayMetrics().widthPixels
+            - layoutParams.width
+            - margin;
+        return Math.max(margin, Math.min(x, Math.max(margin, maximum)));
+    }
+
+    private int clampY(int y) {
+        int margin = dp(8);
+        int maximum = getResources().getDisplayMetrics().heightPixels
+            - layoutParams.height
+            - margin;
+        return Math.max(margin, Math.min(y, Math.max(margin, maximum)));
+    }
+
+    private void savePosition() {
+        getSharedPreferences("overlay", MODE_PRIVATE)
+            .edit()
+            .putInt("x", layoutParams.x)
+            .putInt("y", layoutParams.y)
+            .apply();
     }
 
     private int iconFor(String state) {
@@ -446,7 +634,8 @@ public final class OverlayService extends Service {
 
         GradientDrawable background = new GradientDrawable();
         background.setColor(color);
-        background.setShape(GradientDrawable.OVAL);
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(dp(COLLAPSED_SIZE_DP / 2));
         background.setStroke(dp(1), Color.argb(90, 220, 255, 116));
         return background;
     }

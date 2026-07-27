@@ -83,5 +83,12 @@ This log records what was genuinely designed, implemented, and verified in the b
 ### Interface boundary
 
 - Kept the overlay scoped to voice capture and task status.
-- Deferred visual polish of the floating control until after the execution
-  prototype is stable.
+- Made the compact floating control draggable and persisted its last position.
+- Separated dragging, tapping, and press-and-hold so moving the control does
+  not accidentally start voice capture.
+- Made a tap reveal or hide the latest status, while press-and-hold records
+  until release.
+- Expanded listening, working, clarification, and result states into a bounded
+  292 dp by 64 dp horizontal pill instead of taking over the active app.
+- Rebuilt and installed the overlay on the Pixel, then verified the live
+  Android overlay window expands to 767 by 168 physical pixels at 420 dpi.

@@ -9,6 +9,8 @@ JAVAC_TASK="/opt/homebrew/opt/openjdk@17/bin/javac"
 JAR_TASK="/opt/homebrew/opt/openjdk@17/bin/jar"
 DEBUG_KEYSTORE_TASK="/Users/suraj/.android/debug.keystore"
 BUILD_TMP_TASK="$(mktemp -d)"
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
+export PATH="${JAVA_HOME}/bin:${PATH}"
 
 mkdir -p "${SCRIPT_DIR}/dist"
 mkdir -p "${BUILD_TMP_TASK}/classes" "${BUILD_TMP_TASK}/dex"
