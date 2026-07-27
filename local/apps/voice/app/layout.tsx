@@ -4,16 +4,16 @@ import './styles.css';
 
 export const metadata: Metadata = {
   applicationName: 'ErrandOS',
-  description: 'Ask once. Watch the task happen safely on your phone.',
+  description: 'A tiny voice companion for safe, real-world errands.',
   manifest: '/manifest.webmanifest',
-  title: 'ErrandOS — speak, then done',
+  title: 'ErrandOS — your pocket errand buddy',
 };
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
+  colorScheme: 'light',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#10130f',
+  themeColor: '#fffdf6',
   userScalable: false,
   width: 'device-width',
 };
