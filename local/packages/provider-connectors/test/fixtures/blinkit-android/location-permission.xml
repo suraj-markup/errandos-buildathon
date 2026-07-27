@@ -1,0 +1,7 @@
+<hierarchy>
+  <node text="Location permission not enabled" clickable="false" />
+  <node text="Please enable location permission for a better delivery experience" clickable="false" />
+  <node text="Enable device location" clickable="true" />
+  <node text="Select location manually" clickable="true" />
+  <node text="Search for atta, dal, coke and more" clickable="true" />
+</hierarchy>

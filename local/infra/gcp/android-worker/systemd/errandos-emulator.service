@@ -1,0 +1,20 @@
+[Unit]
+Description=ErrandOS persistent Android emulator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=errandos
+Group=errandos
+Environment=ANDROID_HOME=/opt/android-sdk
+Environment=ANDROID_AVD_HOME=/home/errandos/.android/avd
+Environment=HOME=/home/errandos
+Environment=ADB_VENDOR_KEYS=/home/errandos/.android
+ExecStart=/opt/android-sdk/emulator/emulator @errandos_pixel_api35 -no-window -no-audio -no-boot-anim -no-snapshot -gpu lavapipe -accel on -memory 8192 -cores 4 -timezone Asia/Kolkata -camera-back none -camera-front none
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

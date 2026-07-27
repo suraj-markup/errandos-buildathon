@@ -17,10 +17,11 @@ See [the hosted overview](hosted/HOSTED.md) and
 ### Local
 
 [`local/`](local/) is the phone-first implementation used for the buildathon
-demo. A circular push-to-talk overlay records while held, uses Sarvam for
-Indian-language speech recognition and speech generation, asks spoken
-follow-up questions when a product is ambiguous, and drives the official app
-through Appium on the Mac.
+demo. It is now self-contained: it includes the complete hosted control plane,
+worker, contracts, persistence, Hermes skill, and semantic Blinkit driver
+alongside the circular push-to-talk overlay and Sarvam voice server. The
+overlay stays a thin voice-and-status surface while the copied execution stack
+owns recovery, exact offer selection, cart mutation, and verification.
 
 See [the local overview](local/LOCAL.md), [product description](local/docs/PRODUCT.md),
 and [build log](local/docs/BUILD_LOG.md).

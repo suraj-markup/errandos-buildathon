@@ -38,6 +38,7 @@ type SarvamTranscript = {
 };
 
 type GroceryOption = {
+  offerId?: string;
   product?: string;
   price?: string;
   size?: string;
@@ -99,8 +100,16 @@ const phoneTools = [
             'Never invent a variant or size that the user did not say.',
           ].join(' '),
         },
+        offerId: {
+          type: ['string', 'null'],
+          description: [
+            'The opaque offerId from a pending visible option.',
+            'Use null on the first search.',
+            'Never invent an offerId and never copy an ID from outside the pending options.',
+          ].join(' '),
+        },
       },
-      required: ['request'],
+      required: ['request', 'offerId'],
     },
   },
   {
@@ -174,6 +183,7 @@ function phoneActionForCall(
     return {
       action: 'prepare_grocery',
       request: arguments_.request,
+      ...(arguments_.offerId ? { offerId: arguments_.offerId } : {}),
       ...(pendingGrocery ? { searchQuery: pendingGrocery.request } : {}),
     };
   }
@@ -332,6 +342,7 @@ export async function POST(request: Request): Promise<Response> {
       'Pass the user’s exact product phrase to prepare_grocery; do not invent or silently choose a brand, flavor, pack, or size.',
       'When structured pending grocery options are provided, treat the new speech as the answer to that prior question.',
       'Resolve a matching follow-up to the full exact visible product and size before calling prepare_grocery.',
+      'When a pending option is selected, pass its exact opaque offerId to prepare_grocery. Never invent an offerId.',
       'If multiple pending options remain and the user only says add to cart, ask which option; never choose one yourself.',
       'Use open_blinkit only for a bare request to open the app.',
       'Use prepare_cod_checkout to review an existing cart for Cash on Delivery; it never places the order.',
@@ -356,6 +367,7 @@ export async function POST(request: Request): Promise<Response> {
           `Visible options: ${JSON.stringify(conversation.pendingGrocery.options)}`,
           `New spoken answer: ${transcript}`,
           'Use only these visible options. If the answer uniquely identifies one, call prepare_grocery with its full exact product name and size.',
+          'Pass the selected visible option’s exact offerId. If no option is uniquely selected, do not call the tool.',
           'If the answer does not uniquely identify one, ask a short follow-up and do not add anything.',
         ].join('\n')
       : conversation?.pendingCod
@@ -455,7 +467,11 @@ export async function POST(request: Request): Promise<Response> {
       };
     } else if (
       firstToolResult
-        && firstToolResult.status !== 'needs_clarification'
+        && ![
+          'needs_clarification',
+          'automation_failed',
+          'device_locked',
+        ].includes(firstToolResult.status ?? '')
     ) {
       pendingGrocery = undefined;
     }
@@ -498,7 +514,8 @@ export async function POST(request: Request): Promise<Response> {
       ? 'clarification'
       : ['added', 'already_in_cart', 'ordered'].includes(firstToolResult?.status ?? '')
         ? 'success'
-        : [
+          : [
+            'automation_failed',
             'checkout_changed',
             'order_attempt_already_made',
             'order_status_ambiguous',

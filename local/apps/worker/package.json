@@ -1,0 +1,6 @@
+{
+  "name": "@errandos/worker", "private": true, "type": "module", "files": ["dist"],
+  "scripts": { "prebuild": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/provider-connectors build", "build": "tsc -p tsconfig.json", "pretypecheck": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/provider-connectors build", "typecheck": "tsc -p tsconfig.json --noEmit", "lint": "eslint src test", "test": "vitest run --passWithNoTests" },
+  "dependencies": { "@errandos/contracts": "workspace:*", "@errandos/provider-connectors": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" }
+}

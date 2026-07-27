@@ -1,0 +1,20 @@
+[Unit]
+Description=ErrandOS local-only Appium
+After=errandos-emulator.service
+Requires=errandos-emulator.service
+
+[Service]
+Type=simple
+User=errandos
+Group=errandos
+Environment=ANDROID_HOME=/opt/android-sdk
+Environment=APPIUM_HOME=/opt/appium-home
+Environment=HOME=/home/errandos
+Environment=ADB_VENDOR_KEYS=/home/errandos/.android
+Environment=PATH=/opt/node/bin:/opt/android-sdk/platform-tools:/usr/bin:/bin
+ExecStart=/opt/appium/bin/appium --address 127.0.0.1 --port 4723 --log-level error --log-no-colors
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,7 @@
     "allowJs": false,
     "incremental": true,
     "jsx": "preserve",
+    "exactOptionalPropertyTypes": false,
     "lib": [
       "dom",
       "dom.iterable",
@@ -11,6 +12,7 @@
     ],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "noPropertyAccessFromIndexSignature": false,
     "noEmit": true,
     "plugins": [
       {

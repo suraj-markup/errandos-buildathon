@@ -1,47 +1,72 @@
 # Local ErrandOS
 
-This directory is the phone-first ErrandOS implementation used for the
-buildathon demo.
+`local/` is a self-contained phone-first ErrandOS workspace. It contains the
+full hosted execution stack plus the buildathon-specific Android overlay and
+voice server.
 
-## Interaction
+## What is included
 
-1. The user presses and holds the circular floating button.
-2. The phone records speech for as long as the button is held.
-3. Releasing the button sends the turn to the Mac voice server.
-4. Sarvam transcribes the speech and preserves the user's Indian language.
-5. The intelligence layer selects a narrow phone action.
-6. Appium performs the action in the official Android app.
-7. The overlay speaks progress, clarification questions, and results through
-   Sarvam in the same language.
+- `apps/voice`: Sarvam STT/TTS, OpenAI tool planning, follow-up state, and the
+  phone-facing API.
+- `apps/android-overlay`: the thin push-to-talk and status surface installed on
+  the phone.
+- `apps/control-plane`, `apps/worker`, and `apps/web`: the copied control plane,
+  worker, and hosted web client.
+- `packages/provider-connectors`: the semantic Blinkit/Appium driver, bounded
+  screen recovery, exact offer selection, cart verification, COD review, and
+  guarded commit logic.
+- `packages/contracts`, `application`, `domain`, `persistence`, and supporting
+  packages: the typed and durable execution foundation.
+- `hermes`, `infra`, `scripts`, and `docs`: the corresponding skills,
+  deployment assets, utilities, tests, and design records.
 
-Follow-up turns retain the pending product choices. A specific product can be
-selected by name, while “add to cart” applies directly when only one pending
-choice remains.
+The sibling `hosted/` directory remains unchanged and independently runnable.
+No runtime dependency points from `local/` back to `hosted/`.
 
-## Runtime
+## Prototype flow
 
-The current demo uses:
-
-- an Android phone with the ErrandOS overlay installed;
-- wireless ADB between the phone and Mac;
-- Appium on the Mac;
-- the Next.js voice server in `apps/voice`;
-- server-managed OpenAI and Sarvam keys.
-
-Copy `apps/voice/.env.example` to `apps/voice/.env.local` and fill the real
-server-side values. Never place keys in the Android client or commit the local
-env file.
-
-From the repository root:
-
-```bash
-pnpm --dir local install
-pnpm --dir local typecheck
-pnpm --dir local test
-pnpm --dir local --filter @errandos/voice exec next dev --hostname 0.0.0.0 --port 3100
+```text
+hold overlay
+  → Sarvam speech-to-text
+  → OpenAI tool planning
+  → hosted Blinkit driver copied into local
+  → search visible offers
+  → ask a spoken follow-up when ambiguous
+  → continue with the selected opaque offerId
+  → mutate and verify the cart
+  → Sarvam speaks the verified result
 ```
 
-The local implementation can be disconnected from USB after wireless ADB is
-connected and the overlay is installed. The current execution path still
-requires the Mac server, Appium, wireless ADB, and the phone and Mac to be on
-the same network.
+The overlay is intentionally only a voice-and-status interface. Product
+matching, screen recovery, cart correctness, and transaction safety live in
+the execution stack rather than in UI code.
+
+## Run
+
+```bash
+pnpm install
+pnpm --filter @errandos/voice dev
+```
+
+In another terminal, start Appium. Keep the real values only in
+`apps/voice/.env.local`; use `apps/voice/.env.example` as the template.
+
+The Android device serial may be a USB serial or a wireless ADB address:
+
+```dotenv
+APPIUM_URL=http://127.0.0.1:4723
+ANDROID_DEVICE_UDID=192.168.1.100:5555
+```
+
+## Verify
+
+```bash
+pnpm --filter @errandos/provider-connectors test
+pnpm --filter @errandos/voice test
+pnpm --filter @errandos/voice typecheck
+```
+
+Live verification should begin with a broad search, which must return
+`needs_clarification` without changing the cart. Only then test a selected
+`offerId`. Never exercise the final Place Order action against a real cart
+unless the user has explicitly reviewed and authorized the exact terms.

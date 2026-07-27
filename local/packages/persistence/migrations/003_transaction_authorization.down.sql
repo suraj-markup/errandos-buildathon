@@ -1,0 +1,15 @@
+DROP TRIGGER IF EXISTS audit_events_append_only ON audit_events;
+DROP TRIGGER IF EXISTS proposal_revisions_append_only ON proposal_revisions;
+DROP FUNCTION IF EXISTS reject_append_only_mutation();
+DROP TABLE IF EXISTS audit_events;
+DROP TABLE IF EXISTS lifecycle_events;
+DROP TABLE IF EXISTS reconciliation_attempts;
+DROP TABLE IF EXISTS transaction_outbox;
+DROP TABLE IF EXISTS transaction_receipts;
+DROP TABLE IF EXISTS transaction_runtime_idempotency;
+DROP TABLE IF EXISTS transaction_runtime_proposals;
+DROP TABLE IF EXISTS commit_attempts;
+DROP TABLE IF EXISTS authorization_capabilities;
+DROP TABLE IF EXISTS approval_decisions;
+DROP TABLE IF EXISTS approval_requests;
+DROP TABLE IF EXISTS proposal_revisions;

@@ -3,13 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "build": "next build",
+    "predev": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "dev": "next dev --hostname 0.0.0.0",
     "start": "next start --hostname 0.0.0.0",
+    "pretest": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "test": "vitest run --passWithNoTests",
+    "pretypecheck": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@errandos/provider-connectors": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

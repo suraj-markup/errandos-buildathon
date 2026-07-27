@@ -47,3 +47,41 @@ This log records what was genuinely designed, implemented, and verified in the b
 - Kept the phone/Appium/Sarvam implementation as the first-class `local`
   workspace.
 - Preserved local env files while committing only safe env templates.
+
+## 2026-07-27
+
+### Self-contained local execution stack
+
+- Copied the hosted control plane, worker, web client, typed contracts,
+  application/domain/persistence packages, provider connectors, Hermes skill,
+  infrastructure, tests, scripts, and documentation into `local/`.
+- Kept `hosted/` unchanged and independently runnable.
+- Preserved the Android overlay, voice app, and ignored local env file.
+- Replaced the voice app's hardcoded Blinkit search IDs with the copied
+  semantic Appium driver and bounded screen recovery.
+- Added an explicit Appium device identifier so USB and wireless ADB devices
+  can be selected deterministically.
+- Carried opaque Blinkit `offerId` values through spoken clarification state,
+  ensuring a follow-up selects the exact visible offer rather than a new
+  top-ranked search result.
+- Kept pending clarification state after retryable automation failures.
+- Added idempotent `already_in_cart` handling for repeated voice commands.
+
+### Live prototype verification
+
+- Confirmed the Pixel, Appium, and local voice server were reachable.
+- Reproduced and fixed Blinkit's XML-encoded apostrophe mismatch for
+  `Lays`/`Lay's`.
+- Verified a broad “Lays” request returns three visible choices without
+  changing the cart.
+- Verified the selected 58 g Magic Masala offer is added and independently
+  present in the cart at quantity one.
+- Verified a real two-turn voice exchange: Sarvam transcribed both turns,
+  OpenAI selected the stored offer ID, the pending follow-up survived a
+  retryable failure, and Sarvam produced a verified spoken cart response.
+
+### Interface boundary
+
+- Kept the overlay scoped to voice capture and task status.
+- Deferred visual polish of the floating control until after the execution
+  prototype is stable.

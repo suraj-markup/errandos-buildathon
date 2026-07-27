@@ -1,0 +1,21 @@
+mcp_servers:
+  errandos:
+    command: pnpm
+    args:
+      - --dir
+      - /absolute/path/to/errandos
+      - --filter
+      - '@errandos/control-plane'
+      - exec
+      - tsx
+      - src/mcp-entry.ts
+    env:
+      ERRANDOS_DEPLOYMENT_PROFILE: personal
+      ERRANDOS_PERSISTENCE_MODE: filesystem
+      ERRANDOS_DATA_ROOT: /var/lib/errandos
+      ERRANDOS_PRINCIPAL_ID: local-hermes
+      ERRANDOS_PROFILE_REF_SECRET: replace-with-at-least-32-random-bytes
+      ERRANDOS_APPROVAL_HMAC_SECRET: replace-with-a-different-32-byte-secret
+      ERRANDOS_TRUSTED_AUTONOMOUS_COD: 'true'
+      ERRANDOS_LIVE_BROWSER_ACTIONS: 'false'
+      ERRANDOS_LIVE_COMMIT: 'false'

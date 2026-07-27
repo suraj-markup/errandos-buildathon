@@ -1,0 +1,24 @@
+{
+  "name": "@errandos/control-plane",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pretypecheck": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build && pnpm --filter @errandos/persistence build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "pretest": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build && pnpm --filter @errandos/persistence build",
+    "test": "vitest run",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@errandos/contracts": "workspace:*",
+    "@errandos/application": "workspace:*",
+    "@errandos/provider-connectors": "workspace:*",
+    "@errandos/persistence": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "fastify": "^5.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": { "@types/node": "^22.0.0", "tsx": "^4.0.0" }
+}
