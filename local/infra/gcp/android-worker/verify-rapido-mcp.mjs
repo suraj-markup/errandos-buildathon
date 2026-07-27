@@ -51,7 +51,7 @@ try {
     'rapido_resend_otp',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
-    throw new Error('ErrandOS canonical MCP surface mismatch');
+    throw new Error('JaldiAI canonical MCP surface mismatch');
   }
   const result = await client.callTool({
     name: 'rapido_auth_status',

@@ -1,6 +1,6 @@
-# Hosted ErrandOS
+# Hosted JaldiAI
 
-This directory is the first-class hosted ErrandOS implementation. It is built
+This directory is the first-class hosted JaldiAI implementation. It is built
 around Hermes, typed MCP tools, a control plane, durable transaction state,
 provider workers, and hosted web and voice entry points.
 
@@ -10,7 +10,7 @@ build history.
 
 ## Source provenance
 
-- The source state came from the private ErrandOS working tree at commit
+- The source state came from the private JaldiAI working tree at commit
   `1b605ec`, including its additional modified and untracked source files.
 - Files were copied into this repository; commits were not cherry-picked and
   old Git objects were not imported.

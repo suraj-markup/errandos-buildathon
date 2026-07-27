@@ -2,18 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Provision an isolated ErrandOS resource namespace inside the owner-authorized existing GCP project and one KVM-accelerated persistent Android emulator, then prove that the official Blinkit app supports login, restart persistence, search, reversible cart preparation, checkout extraction, and truthful COD detection without using Playwright or placing an order.
+**Goal:** Provision an isolated JaldiAI resource namespace inside the owner-authorized existing GCP project and one KVM-accelerated persistent Android emulator, then prove that the official Blinkit app supports login, restart persistence, search, reversible cart preparation, checkout extraction, and truthful COD detection without using Playwright or placing an order.
 
-**Architecture:** Hermes and the durable ErrandOS control plane remain on the existing VPC. A dedicated VPC, subnet, service account, Intel N2 VM, persistent Android emulator, and local-only Appium/ADB are created inside the owner-authorized billing-enabled GCP project; unrelated resources are not modified. This plan stops at the infrastructure/provider feasibility gate; the typed `AndroidBlinkitAdapter` integration receives a separate implementation plan only after the canary passes.
+**Architecture:** Hermes and the durable JaldiAI control plane remain on the existing VPC. A dedicated VPC, subnet, service account, Intel N2 VM, persistent Android emulator, and local-only Appium/ADB are created inside the owner-authorized billing-enabled GCP project; unrelated resources are not modified. This plan stops at the infrastructure/provider feasibility gate; the typed `AndroidBlinkitAdapter` integration receives a separate implementation plan only after the canary passes.
 
 **Tech Stack:** Google Cloud CLI 567+, Compute Engine N2, Ubuntu 24.04 x86-64, nested KVM, Android SDK command-line tools 14742923, Android Emulator, Google Play x86-64 system image, Node.js 22, Appium 3, UiAutomator2, Bash, pnpm workspaces.
 
 ## Global Constraints
 
-- Use the owner-authorized existing billing-enabled GCP project; isolate every new resource with the `errandos-android` name or ErrandOS labels and never modify unrelated resources.
+- Use the owner-authorized existing billing-enabled GCP project; isolate every new resource with the `errandos-android` name or JaldiAI labels and never modify unrelated resources.
 - Use `asia-south1`, `n2-standard-8`, Ubuntu 24.04 x86-64, a 200 GB persistent SSD-backed disk, and nested virtualization verified through `/dev/kvm`.
 - Run exactly one persistent Android emulator and one mutating provider job at a time.
-- Use the official Blinkit Android application; do not create a custom ErrandOS Android application.
+- Use the official Blinkit Android application; do not create a custom JaldiAI Android application.
 - Do not instantiate or use Playwright for any Blinkit login, search, cart, checkout, status, commit, or reconciliation operation.
 - Bind Appium and ADB to local interfaces only; never expose Appium, ADB, VNC, emulator consoles, screenshots, UI XML, or arbitrary device controls publicly or through MCP.
 - Never echo, log, persist, trace, or screenshot phone numbers, OTPs, cookies, passwords, addresses, payment details, or browser/device state containing personal data.
@@ -154,7 +154,7 @@ printf 'state_file=%s\nexisting_project_selected=true\n' "$STATE_FILE"
 Create `infra/gcp/android-worker/README.md` with these exact operational rules:
 
 ```markdown
-# ErrandOS GCP Android worker
+# JaldiAI GCP Android worker
 
 These scripts operate only on the owner-authorized existing project recorded in
 `$HOME/.local/state/errandos/gcp-android-worker.env`. Every mutating `gcloud`
@@ -196,7 +196,7 @@ test "$(gcloud config get-value project)" = "$PROJECT_ID"
 gcloud projects describe "$PROJECT_ID" --format='value(projectId,lifecycleState)'
 ```
 
-Expected: the authorized project lifecycle state is `ACTIVE`; no new project is created and every later resource uses dedicated ErrandOS names.
+Expected: the authorized project lifecycle state is `ACTIVE`; no new project is created and every later resource uses dedicated JaldiAI names.
 
 ---
 
@@ -236,7 +236,7 @@ done
 test -n "$zone" || { echo "n2-standard-8 unavailable in asia-south1" >&2; exit 5; }
 
 gcloud iam service-accounts describe "$SERVICE_ACCOUNT" --project="$PROJECT_ID" >/dev/null 2>&1 || \
-  gcloud iam service-accounts create android-worker --display-name="ErrandOS Android Worker" --project="$PROJECT_ID"
+  gcloud iam service-accounts create android-worker --display-name="JaldiAI Android Worker" --project="$PROJECT_ID"
 for role in roles/logging.logWriter roles/monitoring.metricWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SERVICE_ACCOUNT" --role="$role" --condition=None >/dev/null
@@ -381,7 +381,7 @@ Create `infra/gcp/android-worker/systemd/errandos-emulator.service`:
 
 ```ini
 [Unit]
-Description=ErrandOS persistent Android emulator
+Description=JaldiAI persistent Android emulator
 After=network-online.target
 Wants=network-online.target
 
@@ -406,7 +406,7 @@ Create `infra/gcp/android-worker/systemd/errandos-appium.service`:
 
 ```ini
 [Unit]
-Description=ErrandOS local-only Appium
+Description=JaldiAI local-only Appium
 After=errandos-emulator.service
 Requires=errandos-emulator.service
 

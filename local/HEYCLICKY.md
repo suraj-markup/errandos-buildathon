@@ -2,7 +2,7 @@
 
 ## Voice provider decision
 
-- Use Sarvam as the preferred speech layer so ErrandOS can understand and respond in Indian languages, regional accents, and mixed-language speech such as Hinglish.
+- Use Sarvam as the preferred speech layer so JaldiAI can understand and respond in Indian languages, regional accents, and mixed-language speech such as Hinglish.
 - Keep speech-to-text and text-to-speech behind a provider interface. The reasoning and Appium execution layers should not depend directly on Sarvam-specific APIs.
 - Preserve the detected language throughout the session and reply in the language—or language mix—the user naturally uses.
 - Keep the intelligence and tool-calling layer separate from speech. Sarvam handles voice and language processing; the agent plans the task and the Appium bridge executes it on the phone.

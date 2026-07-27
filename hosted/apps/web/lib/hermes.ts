@@ -28,8 +28,8 @@ const LANGUAGE_NAMES: Record<SupportedLanguageCode, string> = {
 };
 
 const voiceTurnInstructions = (languageCode: SupportedLanguageCode): string => `
-This request came from the ErrandOS voice interface. Sarvam translated the user's ${LANGUAGE_NAMES[languageCode]} speech into English.
-Use the ErrandOS skill and typed ErrandOS MCP tools for provider operations. Never guess a product, quantity, price, address, or approval.
+This request came from the JaldiAI voice interface. Sarvam translated the user's ${LANGUAGE_NAMES[languageCode]} speech into English.
+Use the JaldiAI skill and typed JaldiAI MCP tools for provider operations. Never guess a product, quantity, price, address, or approval.
 Ask a short clarification question when the translated request is ambiguous.
 Reply in concise English; the interface will localize the prose back to ${LANGUAGE_NAMES[languageCode]}.
 Wrap every provider-sourced fact that must remain exact in [[fact:...]] markers. This includes product titles, pack sizes, quantities, prices, fees, total, ETA, address, payment mode, expiry, proposal IDs, status, and provider references.

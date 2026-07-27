@@ -1,10 +1,10 @@
-# ErrandOS
+# JaldiAI
 
 [Live web interface](https://chores-ai.vercel.app/)
 
-ErrandOS is a Hermes-first personal operations control plane for real-world errands in India. Its current production slice lets one owner use natural language to search Blinkit, manage a real cart, review exact COD terms, place an explicitly requested order at most once, reconcile uncertain outcomes, and share the official cart link.
+JaldiAI is a Hermes-first personal operations control plane for real-world errands in India. Its current production slice lets one owner use natural language to search Blinkit, manage a real cart, review exact COD terms, place an explicitly requested order at most once, reconcile uncertain outcomes, and share the official cart link.
 
-Hermes owns the conversation and reasoning. ErrandOS owns provider access, durable state, transaction safety, and the final external action.
+Hermes owns the conversation and reasoning. JaldiAI owns provider access, durable state, transaction safety, and the final external action.
 
 ## Current status
 
@@ -13,7 +13,7 @@ The Blinkit Android workflow is implemented and live verified through the normal
 ```text
 Telegram / web
     → Hermes
-    → typed ErrandOS MCP tools
+    → typed JaldiAI MCP tools
     → owner VPC
     → private SSH/Tailscale connection
     → GCP Android worker
@@ -45,9 +45,9 @@ The canonical implementation roadmap and live evidence are maintained in [docs/b
 ```mermaid
 flowchart LR
     U["Owner<br/>Telegram or web"] --> H["Hermes<br/>conversation and intent"]
-    H --> S["ErrandOS Hermes skill"]
+    H --> S["JaldiAI Hermes skill"]
     S --> M["Typed MCP tools"]
-    M --> C["ErrandOS control plane"]
+    M --> C["JaldiAI control plane"]
     C <--> D["Durable state<br/>filesystem or PostgreSQL"]
     C --> Q["Per-owner/account<br/>operation serialization"]
     Q --> SSH["Restricted SSH<br/>private network"]
@@ -62,11 +62,11 @@ flowchart LR
 
 - Understand natural-language intent.
 - Ask for missing product, quantity, address, or approval information.
-- Select narrow ErrandOS tools.
+- Select narrow JaldiAI tools.
 - Render structured results as readable messages or cards.
 - Poll durable operations and continue the conversation.
 
-### ErrandOS responsibilities
+### JaldiAI responsibilities
 
 - Custody of provider account and emulator state.
 - Principal-isolated provider operations.
@@ -94,14 +94,14 @@ Hermes renders the exact terms and proposal hash
     ↓
 Owner explicitly asks to place those terms
     ↓
-ErrandOS revalidates the provider fingerprint and idempotency key
+JaldiAI revalidates the provider fingerprint and idempotency key
     ↓
 One final provider action is attempted at most once
     ↓
 Verified receipt, blocked result, or ambiguous reconciliation state
 ```
 
-Preparation never places an order. If a final action times out or cannot be verified, ErrandOS records an `ambiguous` result and reconciles using read-only provider history. It never blindly repeats the final action.
+Preparation never places an order. If a final action times out or cannot be verified, JaldiAI records an `ambiguous` result and reconciles using read-only provider history. It never blindly repeats the final action.
 
 ## Canonical Hermes tools
 
@@ -161,7 +161,7 @@ Legacy generic transaction handlers remain available only when `ERRANDOS_MCP_LEG
 
 ## Safety and transaction invariants
 
-ErrandOS treats paid external actions as transactions rather than chat replies.
+JaldiAI treats paid external actions as transactions rather than chat replies.
 
 1. Search and status reads are safe.
 2. Cart editing and grocery/ride preparation may operate the official app but must stop before the final order or ride-request action.
@@ -319,7 +319,7 @@ Never expose these values through browser bundles.
 
 Blinkit runs only through the provider-specific `AndroidBlinkitAdapter`, which operates the official app in a principal-isolated persistent emulator. Playwright is not an active Blinkit runtime.
 
-ErrandOS does not:
+JaldiAI does not:
 
 - Reverse-engineer private provider APIs.
 - Intercept provider traffic.

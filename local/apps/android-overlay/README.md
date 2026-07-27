@@ -1,4 +1,4 @@
-# ErrandOS Android overlay
+# JaldiAI Android overlay
 
 Minimal native status overlay for the buildathon phone agent.
 

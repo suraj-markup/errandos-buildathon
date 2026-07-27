@@ -1,6 +1,6 @@
-# Local ErrandOS
+# Local JaldiAI
 
-`local/` is a self-contained phone-first ErrandOS workspace. It contains the
+`local/` is a self-contained phone-first JaldiAI workspace. It contains the
 full hosted execution stack plus the buildathon-specific Android overlay and
 voice server.
 
@@ -42,6 +42,13 @@ matching, screen recovery, cart correctness, and transaction safety live in
 the execution stack rather than in UI code.
 
 ## Run
+
+The current demo needs the Android phone and Mac on the same network,
+wireless ADB, Appium on the Mac, and server-managed OpenAI and Sarvam keys.
+Copy `apps/voice/.env.example` to `apps/voice/.env.local`; never place keys in
+the Android client or commit the local env file.
+
+From `local/`:
 
 ```bash
 pnpm install

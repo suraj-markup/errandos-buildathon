@@ -1,6 +1,6 @@
 # Transaction architecture
 
-Hermes owns conversation and orchestration. ErrandOS owns typed provider access, durable state, immutable SHA-256 proposals, expiration, ownership, approval verification, idempotency, final-action dispatch, receipts, and reconciliation.
+Hermes owns conversation and orchestration. JaldiAI owns typed provider access, durable state, immutable SHA-256 proposals, expiration, ownership, approval verification, idempotency, final-action dispatch, receipts, and reconciliation.
 
 Blinkit runs only through `AndroidBlinkitAdapter`; Rapido runs only through `AndroidRapidoAdapter`. The control plane sends one validated request over GCP SSH/IAP to a fixed worker command. The worker talks to Appium on localhost and Appium controls the persistent official provider apps. MCP never exposes selectors, coordinates, device commands, screenshots, UI XML, Appium sessions, phone numbers, OTPs, or emulator state.
 

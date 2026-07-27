@@ -1,4 +1,4 @@
-# ErrandOS GCP Android worker
+# JaldiAI GCP Android worker
 
 These scripts operate only on the owner-authorized existing project recorded in
 `$HOME/.local/state/errandos/gcp-android-worker.env`. Every mutating `gcloud`
@@ -30,7 +30,7 @@ host-local worker connection settings, writes the PNG to a private Hermes cache
 directory, validates the PNG signature, and prints only the absolute path so
 the Telegram gateway can deliver it as media. Restrict the corresponding
 `/screen` quick command to the single owner through Hermes slash-command access
-control. Never register this path as an ErrandOS MCP tool.
+control. Never register this path as an JaldiAI MCP tool.
 
 `infra/hermes/install-screen-command.py` adds the `/screen` quick command and
 enables slash-command gating. It refuses to proceed unless

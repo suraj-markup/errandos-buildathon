@@ -1,5 +1,5 @@
 [Unit]
-Description=ErrandOS persistent Android emulator
+Description=JaldiAI persistent Android emulator
 After=network-online.target
 Wants=network-online.target
 

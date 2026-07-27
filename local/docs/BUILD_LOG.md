@@ -6,7 +6,7 @@ This log records what was genuinely designed, implemented, and verified in the b
 
 ### Foundation
 
-- Defined ErrandOS as the transaction-safe execution layer beneath Hermes.
+- Defined JaldiAI as the transaction-safe execution layer beneath Hermes.
 - Chose a single Blinkit grocery vertical slice for the MVP.
 - Defined the core proposal, approval, idempotency, receipt, and reconciliation guarantees.
 - Separated the deterministic judging path from optional live Android-provider work.
@@ -23,7 +23,7 @@ This log records what was genuinely designed, implemented, and verified in the b
 1. Implement a deterministic demo provider.
 2. Canonicalize and hash exact proposal terms.
 3. Enforce approval and idempotent, at-most-once commit behavior.
-4. Expose the first narrow ErrandOS tools.
+4. Expose the first narrow JaldiAI tools.
 5. Build the request, proposal-review, and status interface.
 6. Add an end-to-end demo and verification evidence.
 

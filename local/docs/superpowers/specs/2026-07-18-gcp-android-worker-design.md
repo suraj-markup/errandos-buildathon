@@ -5,13 +5,13 @@
 
 ## Decision
 
-ErrandOS will keep Hermes and the durable transaction control plane on the existing VPC while moving mobile-provider execution to a persistent Android emulator on Google Compute Engine. The owner has authorized deployment inside the existing billing-enabled GCP project. ErrandOS resources are isolated there by a dedicated VPC, subnet, service account, VM, disk, labels, and local state; unrelated existing resources are not modified.
+JaldiAI will keep Hermes and the durable transaction control plane on the existing VPC while moving mobile-provider execution to a persistent Android emulator on Google Compute Engine. The owner has authorized deployment inside the existing billing-enabled GCP project. JaldiAI resources are isolated there by a dedicated VPC, subnet, service account, VM, disk, labels, and local state; unrelated existing resources are not modified.
 
 The first release runs one Blinkit account on one emulator. All Blinkit provider interaction uses the official Android application through a provider-specific Appium adapter. Playwright sessions are not used for Blinkit login, search, cart preparation, checkout, commit, status, or reconciliation. The release proves login, session persistence, search, reversible cart preparation, checkout extraction, COD selection, guarded commit, receipt verification, and read-only reconciliation before adding providers or concurrency.
 
 ## Project and infrastructure
 
-Use the owner's currently configured, billing-enabled GCP project. Enable only APIs needed for Compute Engine, logging, monitoring, and optional IAP administration. Every created resource uses the `errandos-android` prefix or equivalent ErrandOS labels, and every mutating command explicitly names the authorized project.
+Use the owner's currently configured, billing-enabled GCP project. Enable only APIs needed for Compute Engine, logging, monitoring, and optional IAP administration. Every created resource uses the `errandos-android` prefix or equivalent JaldiAI labels, and every mutating command explicitly names the authorized project.
 
 The initial worker uses:
 
@@ -33,7 +33,7 @@ The owner has authorized the canary VM to remain running while implementation is
 Private Telegram / Hermes
           |
           v
-ErrandOS control plane on existing VPC
+JaldiAI control plane on existing VPC
   - typed MCP tools
   - proposals and hashes
   - idempotency and dispatch state
@@ -77,12 +77,12 @@ Emulator data and provider sessions remain on the dedicated persistent disk. Log
 
 ## Transaction flow
 
-1. Hermes sends an intent to a narrow ErrandOS tool.
-2. ErrandOS creates or loads the durable operation and dispatches a typed job.
+1. Hermes sends an intent to a narrow JaldiAI tool.
+2. JaldiAI creates or loads the durable operation and dispatches a typed job.
 3. The Android worker acquires the single emulator lease.
 4. The Blinkit adapter performs the semantic operation and returns sanitized structured facts.
 5. Cart preparation extracts exact item identity, quantity, price, fees, ETA, address label, payment mode, and provider fingerprint.
-6. ErrandOS creates an immutable proposal hash.
+6. JaldiAI creates an immutable proposal hash.
 7. Commit revalidates the exact terms and requires an idempotency key. Personal owner-autonomous mode permits Blinkit COD only.
 8. The final provider action is attempted at most once.
 9. A verified provider reference produces a committed receipt. Any unverified outcome becomes `ambiguous` and enters read-only reconciliation.
@@ -126,7 +126,7 @@ The GCP canary succeeds only when:
 - no secret or personal data appears in worker responses or retained diagnostics;
 - no order is claimed without a verified provider reference.
 
-If Blinkit blocks the emulator through device-integrity or provider controls, the canary stops. ErrandOS does not bypass device integrity, reverse-engineer private APIs, or misrepresent the device. The fallback is a dedicated physical Android worker, not an unsafe emulator workaround.
+If Blinkit blocks the emulator through device-integrity or provider controls, the canary stops. JaldiAI does not bypass device integrity, reverse-engineer private APIs, or misrepresent the device. The fallback is a dedicated physical Android worker, not an unsafe emulator workaround.
 
 ## Explicit non-goals
 
@@ -135,7 +135,7 @@ If Blinkit blocks the emulator through device-integrity or provider controls, th
 - No Zepto, Instamart, Rapido, or additional provider in the first slice.
 - No parallel provider sessions in the first slice.
 - No live Playwright session or browser-profile dependency for Blinkit.
-- No custom ErrandOS Android application; automation targets the official Blinkit app.
+- No custom JaldiAI Android application; automation targets the official Blinkit app.
 - No card, UPI, wallet, or bank-challenge automation.
 - No public Appium, ADB, VNC, or emulator-console endpoint.
 - No generic browser or device-control MCP tool.

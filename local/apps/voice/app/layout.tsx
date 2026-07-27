@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import './styles.css';
 
 export const metadata: Metadata = {
-  applicationName: 'ErrandOS',
+  applicationName: 'JaldiAI',
   description: 'A tiny voice companion for safe, real-world errands.',
   manifest: '/manifest.webmanifest',
-  title: 'ErrandOS — your pocket errand buddy',
+  title: 'JaldiAI — your pocket errand buddy',
 };
 
 export const viewport: Viewport = {

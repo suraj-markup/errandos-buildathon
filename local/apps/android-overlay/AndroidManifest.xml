@@ -12,7 +12,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="ErrandOS"
+        android:label="JaldiAI"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -31,7 +31,7 @@
             android:foregroundServiceType="microphone|specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Displays owner-requested ErrandOS assistant status above the active app" />
+                android:value="Displays owner-requested JaldiAI assistant status above the active app" />
         </service>
     </application>
 </manifest>

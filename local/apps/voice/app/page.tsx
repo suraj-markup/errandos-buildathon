@@ -81,7 +81,7 @@ const stateCopy: Record<VoiceState, { kicker: string; title: string; hint: strin
   },
   speaking: {
     hint: 'You can interrupt with another tap when I finish.',
-    kicker: 'ERRANDOS SAYS',
+    kicker: 'JALDIAI SAYS',
     title: 'Here’s the update.',
   },
   thinking: {
@@ -135,7 +135,7 @@ function SparkIcon() {
 function ResultSheet({ result }: { result?: ToolResult }) {
   if (!result) {
     return (
-      <section className="starter-card" aria-label="How ErrandOS works">
+      <section className="starter-card" aria-label="How JaldiAI works">
         <div className="starter-heading">
           <span className="mini-spark"><SparkIcon /></span>
           <div>
@@ -411,9 +411,9 @@ export default function VoiceHome() {
       <div className="dot-field" aria-hidden="true" />
 
       <header className="topbar">
-        <a className="brand" href="#" aria-label="ErrandOS home">
+        <a className="brand" href="#" aria-label="JaldiAI home">
           <span className="brand-face"><i /><i /></span>
-          <span>errand<span>os</span></span>
+          <span>jaldi<span>ai</span></span>
         </a>
         <div className="provider-pill">
           <span className="provider-dot" />

@@ -5,9 +5,9 @@
 
 ## Objective
 
-Make a single owner's Hermes deployment able to place real Blinkit COD orders from a Telegram conversation. ErrandOS runs inside the owner's VPC, retains the owner's authenticated Blinkit browser profile, prepares and verifies the cart, attempts the final order action once, and returns a verified receipt or an explicitly uncertain outcome.
+Make a single owner's Hermes deployment able to place real Blinkit COD orders from a Telegram conversation. JaldiAI runs inside the owner's VPC, retains the owner's authenticated Blinkit browser profile, prepares and verifies the cart, attempts the final order action once, and returns a verified receipt or an explicitly uncertain outcome.
 
-The first release uses one ErrandOS process, filesystem transaction state, one persistent Chromium profile, and one active browser operation at a time. PostgreSQL workers and restart-safe distributed execution are a later hardening phase after the personal flow completes a supervised low-value canary.
+The first release uses one JaldiAI process, filesystem transaction state, one persistent Chromium profile, and one active browser operation at a time. PostgreSQL workers and restart-safe distributed execution are a later hardening phase after the personal flow completes a supervised low-value canary.
 
 ## Product experience
 
@@ -15,7 +15,7 @@ The owner can say:
 
 > Order four packets of Lays from Blinkit using COD and deliver them to home.
 
-Hermes interprets the request through the ErrandOS skill. If the saved Blinkit session is active, Hermes prepares and places the order without another approval prompt. If authentication is required, Hermes asks for the phone number, triggers the Blinkit OTP, asks for the OTP in the same private Telegram conversation, submits it through ErrandOS, and resumes the original order.
+Hermes interprets the request through the JaldiAI skill. If the saved Blinkit session is active, Hermes prepares and places the order without another approval prompt. If authentication is required, Hermes asks for the phone number, triggers the Blinkit OTP, asks for the OTP in the same private Telegram conversation, submits it through JaldiAI, and resumes the original order.
 
 Requests stop at the outcome expressed by the owner:
 
@@ -29,17 +29,17 @@ Hermes renders the exact provider, products, variants when available, quantities
 
 Hermes is the owner's intelligence layer. It owns conversation, intent classification, missing-information questions, typed tool selection, and result presentation.
 
-ErrandOS is Hermes's transaction subsystem. It owns the browser profile, provider session, cart manipulation, exact proposal snapshot, autonomous authorization, idempotency, final provider action, receipt, and reconciliation.
+JaldiAI is Hermes's transaction subsystem. It owns the browser profile, provider session, cart manipulation, exact proposal snapshot, autonomous authorization, idempotency, final provider action, receipt, and reconciliation.
 
 Playwright is an internal execution driver. Hermes never receives selectors, cookies, browser objects, profile paths, raw HTML, or arbitrary browser primitives.
 
 ```mermaid
 flowchart TD
     U["Owner in Telegram"] --> H["Hermes<br/>Conversation, intent, orchestration"]
-    H --> S["ErrandOS Hermes Skill<br/>Tool selection and result rendering"]
-    S --> MCP["Typed ErrandOS MCP Tools"]
+    H --> S["JaldiAI Hermes Skill<br/>Tool selection and result rendering"]
+    S --> MCP["Typed JaldiAI MCP Tools"]
 
-    subgraph EOS["ErrandOS — Hermes Transaction Subsystem"]
+    subgraph EOS["JaldiAI — Hermes Transaction Subsystem"]
         MCP --> A{"Blinkit authenticated?"}
         A -- "No" --> PHONE["Hermes requests phone number"]
         PHONE --> BEGIN["provider_begin_login"]
@@ -112,7 +112,7 @@ Use semantic accessible locators and provider-scoped containers. Product selecti
 
 The first release permits the owner to send the phone number and OTP in a private Telegram conversation. Hermes passes those values through the typed login tools to the waiting Playwright page.
 
-The OTP may travel through Telegram, Hermes, and MCP. ErrandOS must not echo it in tool output, persist it in transaction state, or include it in application logs, screenshots, or traces. The in-process login session has a bounded expiry and releases its browser context and profile lock on completion, timeout, or error. A process restart during login requires a fresh OTP; an authenticated persistent profile survives restarts.
+The OTP may travel through Telegram, Hermes, and MCP. JaldiAI must not echo it in tool output, persist it in transaction state, or include it in application logs, screenshots, or traces. The in-process login session has a bounded expiry and releases its browser context and profile lock on completion, timeout, or error. A process restart during login requires a fresh OTP; an authenticated persistent profile survives restarts.
 
 `provider_auth_status` must inspect provider-specific visible state in the saved profile and return a truthful redacted lifecycle state.
 

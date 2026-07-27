@@ -1,4 +1,4 @@
-# Sarvam Telegram voice notes for ErrandOS turns
+# Sarvam Telegram voice notes for JaldiAI turns
 
 Session learning: Telegram voice messages may arrive as text prefixed with a Sarvam wrapper, for example:
 

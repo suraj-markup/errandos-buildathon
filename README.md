@@ -1,7 +1,12 @@
-# ErrandOS
+# JaldiAI
 
-ErrandOS turns a spoken or written errand into a reviewable, transaction-safe
+JaldiAI turns a spoken or written errand into a reviewable, transaction-safe
 action. This repository contains two first-class ways to run it.
+
+
+
+https://github.com/user-attachments/assets/bd348bae-bda7-484f-8857-7aa9803e283c
+
 
 ## Implementations
 

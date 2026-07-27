@@ -8,9 +8,9 @@
 
 ## Objective
 
-Make ErrandOS perform provider work through controlled Playwright browser sessions. The first production slice covers Blinkit and Zepto grocery discovery, authenticated cart preparation, COD review, trusted approval, one guarded order attempt, receipt detection, and read-only reconciliation. A future slice may apply the same transaction boundary to Rapido discovery, authentication, ride quotes, booking, status, and reconciliation.
+Make JaldiAI perform provider work through controlled Playwright browser sessions. The first production slice covers Blinkit and Zepto grocery discovery, authenticated cart preparation, COD review, trusted approval, one guarded order attempt, receipt detection, and read-only reconciliation. A future slice may apply the same transaction boundary to Rapido discovery, authentication, ride quotes, booking, status, and reconciliation.
 
-Hermes remains the conversation and orchestration layer. ErrandOS remains the only component that owns browser sessions, provider state, exact proposals, approval verification, commit authority, receipts, and reconciliation.
+Hermes remains the conversation and orchestration layer. JaldiAI remains the only component that owns browser sessions, provider state, exact proposals, approval verification, commit authority, receipts, and reconciliation.
 
 ## Scope and delivery sequence
 
@@ -49,7 +49,7 @@ Every provider-side operation uses a typed provider adapter backed by Playwright
 
 Cookies, storage state, OTPs, passwords, selectors, page handles, browser profile paths, screenshots, traces, and raw DOM are internal runtime data. Hermes and MCP never receive them. Operators may configure selectors and supervised profiles directly in the secured runtime, but those values are not accepted as chat inputs or generic MCP parameters.
 
-ErrandOS will not reverse-engineer private mobile APIs, replay intercepted provider requests, bypass anti-bot or authentication controls, or expose generic click, JavaScript, navigation, or session tools. Each adapter interacts with the visible provider web experience and must be reviewed against the provider's terms before live use.
+JaldiAI will not reverse-engineer private mobile APIs, replay intercepted provider requests, bypass anti-bot or authentication controls, or expose generic click, JavaScript, navigation, or session tools. Each adapter interacts with the visible provider web experience and must be reviewed against the provider's terms before live use.
 
 ## Architecture
 
@@ -57,7 +57,7 @@ ErrandOS will not reverse-engineer private mobile APIs, replay intercepted provi
 
 The shared runtime owns browser installation checks, context creation, profile directory resolution, profile leases, session timeouts, graceful shutdown, and diagnostics. A profile key is derived from `principalId + provider + accountKey` through an HMAC reference resolver. Raw identity data and filesystem paths never cross the runtime boundary.
 
-Persistent Chromium profile data is credential-equivalent. ErrandOS restricts profile directories to mode `0700` and files to `0600`; production deployment places the data root on an encrypted volume with restricted operating-system access. The application does not claim to encrypt Chromium's live profile format itself.
+Persistent Chromium profile data is credential-equivalent. JaldiAI restricts profile directories to mode `0700` and files to `0600`; production deployment places the data root on an encrypted volume with restricted operating-system access. The application does not claim to encrypt Chromium's live profile format itself.
 
 The runtime exposes narrow internal operations such as opening an anonymous discovery context or running work inside an exclusively leased authenticated context. It does not expose a browser object to MCP.
 
@@ -82,10 +82,10 @@ Selectors and extractors are derived from sanitized captures made during supervi
 ### Durable transaction flow
 
 1. Hermes invokes a typed search or preparation tool.
-2. ErrandOS resolves the principal-scoped provider profile and obtains an exclusive lease.
+2. JaldiAI resolves the principal-scoped provider profile and obtains an exclusive lease.
 3. The provider adapter navigates the visible provider web flow.
 4. Preparation stops at the final review state and extracts exact material terms.
-5. ErrandOS persists canonical proposal bytes, SHA-256 hash, expiry, provider-state reference, and provider fingerprint.
+5. JaldiAI persists canonical proposal bytes, SHA-256 hash, expiry, provider-state reference, and provider fingerprint.
 6. Hermes renders the exact proposal and trusted approval URL; normal chat text is not authorization.
 7. The independent approval service binds a single-use authorization to principal, proposal ID, revision, hash, action, and expiry.
 8. The commit service atomically consumes authorization, reserves dispatch, and writes an outbox event under the idempotency key.
@@ -113,7 +113,7 @@ The booking control follows the same uniqueness and one-invocation rule. Reconci
 
 ## Authentication and supervised sessions
 
-`provider_begin_login` opens a visible persistent context for the selected provider and account key. The user enters passwords, OTPs, or CAPTCHA responses only in that provider browser. ErrandOS persists redacted session lifecycle state such as `authenticating`, `challenge_required`, `active`, `expired`, `revoked`, or `error`.
+`provider_begin_login` opens a visible persistent context for the selected provider and account key. The user enters passwords, OTPs, or CAPTCHA responses only in that provider browser. JaldiAI persists redacted session lifecycle state such as `authenticating`, `challenge_required`, `active`, `expired`, `revoked`, or `error`.
 
 An adapter verifies authentication using provider-specific visible account markers. It never returns cookies or account PII as proof. Login leases include process identity, process start time, and expiry so abandoned locks can be recovered without allowing concurrent profile use.
 

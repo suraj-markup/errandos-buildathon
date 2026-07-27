@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Animated JaldiAI logo mark</title>
+  <desc id="desc">An animated voice waveform flows through a microphone and resolves into a coral checkmark.</desc>
+  <style>
+    .voice {
+      stroke-dasharray: 900;
+      stroke-dashoffset: 900;
+      animation: speak 1.2s cubic-bezier(.4,0,.2,1) forwards;
+    }
+    .mic { animation: arrive .45s ease-out .35s both; transform-origin: 256px 256px; }
+    .check {
+      stroke-dasharray: 120;
+      stroke-dashoffset: 120;
+      animation: approve .4s ease-out 1s forwards;
+    }
+    @keyframes speak { to { stroke-dashoffset: 0; } }
+    @keyframes arrive {
+      from { opacity: 0; transform: scale(.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes approve { to { stroke-dashoffset: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .voice, .mic, .check { animation: none; stroke-dashoffset: 0; }
+    }
+  </style>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g class="voice" stroke="#182521" stroke-width="18">
+      <path d="M40 246h30c14 0 14-52 29-52s15 104 30 104 15-70 30-70 15 38 30 38"/>
+      <path d="M323 266c14 0 14-38 29-38s15 70 30 70 15-104 30-104 15 52 30 52h10"/>
+    </g>
+    <g class="mic" stroke="#182521" stroke-width="18">
+      <rect x="198" y="88" width="116" height="222" rx="58"/>
+      <path d="M170 272c0 48 38 86 86 86s86-38 86-86"/>
+      <path d="M256 358v54M210 412h92"/>
+    </g>
+    <path class="check" d="M394 270l28 28 54-66" stroke="#E25840" stroke-width="20"/>
+  </g>
+</svg>

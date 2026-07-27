@@ -330,7 +330,7 @@ export async function POST(request: Request): Promise<Response> {
         ? `For this turn, reply only in ${detectedLanguageRequirement}`
         : 'Follow the user’s detected Indian language or code-mixed speaking style for this turn.';
     const instructions = [
-      'You are ErrandOS, a concise voice-first assistant operating the owner’s Android phone.',
+      'You are JaldiAI, a concise voice-first assistant operating the owner’s Android phone.',
       'The user may speak an Indian language, English, or a code-mixed combination.',
       'Always reply in the same spoken language, script style, and code-mix as the user.',
       'If the transcript is entirely English, reply only in English.',

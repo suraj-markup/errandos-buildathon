@@ -7,7 +7,7 @@ User
   ↓
 Hermes — conversation, intent, and orchestration
   ↓
-ErrandOS tools — narrow typed capabilities
+JaldiAI tools — narrow typed capabilities
   ↓
 Application layer — proposals, approval, idempotency, lifecycle
   ↓
@@ -18,7 +18,7 @@ Provider port
 Durable proposal, operation, and receipt records
 ```
 
-Hermes owns language and decision-making. ErrandOS owns provider access and transaction correctness.
+Hermes owns language and decision-making. JaldiAI owns provider access and transaction correctness.
 
 ## Planned modules
 

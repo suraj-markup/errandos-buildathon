@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace live Blinkit Playwright execution with a typed, durable Android/Appium workflow on the current GCP emulator and update the ErrandOS skill so any tool-capable agent can search, authenticate, prepare, place one COD order, and reconcile safely.
+**Goal:** Replace live Blinkit Playwright execution with a typed, durable Android/Appium workflow on the current GCP emulator and update the JaldiAI skill so any tool-capable agent can search, authenticate, prepare, place one COD order, and reconcile safely.
 
 **Architecture:** The existing VPC control plane keeps proposals, hashes, idempotency, receipts, and MCP. It invokes a typed worker command over the current restricted GCP SSH/IAP path; that command alone talks to local Appium and the persistent official Blinkit app. The agent uses semantic MCP tools and never receives Appium, ADB, selector, coordinate, screenshot, UI XML, or device-session access.
 
@@ -777,7 +777,7 @@ git commit -m "feat: route Blinkit MCP through Android worker"
 
 ---
 
-### Task 9: Update and validate the portable ErrandOS skill
+### Task 9: Update and validate the portable JaldiAI skill
 
 **Files:**
 - Modify: `hermes/skills/errandos/SKILL.md`
@@ -800,7 +800,7 @@ import { readFile } from 'node:fs/promises';
 import { describe,expect,it } from 'vitest';
 
 const skill=()=>readFile(new URL('../../../hermes/skills/errandos/SKILL.md',import.meta.url),'utf8');
-describe('ErrandOS Hermes skill',()=>{
+describe('JaldiAI Hermes skill',()=>{
   it('uses the typed Android Blinkit workflow',async()=>{
     const text=await skill();
     for(const tool of ['blinkit_auth_status','blinkit_prepare_cod_order','blinkit_place_cod_order','blinkit_reconcile_order'])expect(text).toContain(tool);
@@ -848,9 +848,9 @@ Run the skill creator generator with:
 
 ```bash
 python /Users/suraj/.codex/skills/.system/skill-creator/scripts/generate_openai_yaml.py hermes/skills/errandos \
-  --interface display_name="ErrandOS" \
+  --interface display_name="JaldiAI" \
   --interface short_description="Operate personal Blinkit COD errands safely" \
-  --interface default_prompt="Use ErrandOS typed tools to search, prepare, place, or reconcile my Blinkit COD order."
+  --interface default_prompt="Use JaldiAI typed tools to search, prepare, place, or reconcile my Blinkit COD order."
 python /Users/suraj/.codex/skills/.system/skill-creator/scripts/quick_validate.py hermes/skills/errandos
 ```
 

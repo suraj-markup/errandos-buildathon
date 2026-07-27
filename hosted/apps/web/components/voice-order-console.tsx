@@ -211,9 +211,9 @@ export function VoiceOrderConsole(): ReactNode {
     <main className="app-shell">
       <div className="paper-noise" />
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="ErrandOS Voice home">
+        <a className="brand" href="#top" aria-label="JaldiAI Voice home">
           <span className="brand-mark"><SparkIcon /></span>
-          <span>Errand<span>OS</span></span>
+          <span>Jaldi<span>AI</span></span>
         </a>
         <div className="topbar-note">
           <span className="status-dot" />
@@ -274,7 +274,7 @@ export function VoiceOrderConsole(): ReactNode {
           <div className="conversation" aria-live="polite">
             {messages.map((message) => (
               <article key={message.id} className={`message message-${message.role}`}>
-                <div className="message-meta">{message.role === 'agent' ? 'ErrandOS' : 'You'}</div>
+                <div className="message-meta">{message.role === 'agent' ? 'JaldiAI' : 'You'}</div>
                 <p>{message.text}</p>
                 {message.audioDataUrl ? (
                   <button
@@ -329,7 +329,7 @@ export function VoiceOrderConsole(): ReactNode {
       </section>
 
       <footer>
-        <p>ErrandOS · Personal operations, in your own words.</p>
+        <p>JaldiAI · Personal operations, in your own words.</p>
         <p>Live purchase actions remain protected by separate safety gates.</p>
       </footer>
     </main>

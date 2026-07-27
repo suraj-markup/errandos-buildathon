@@ -1,8 +1,8 @@
-# ErrandOS Production Completion Implementation Plan
+# JaldiAI Production Completion Implementation Plan
 
 > **For Hermes:** Use subagent-driven-development to execute this plan task-by-task with spec review, code-quality review, and verification after each milestone.
 
-**Goal:** Turn the existing ErrandOS foundation into a safe, production-capable Telegram-first system that can search products, prepare Blinkit/Zepto carts, obtain independent human approval, commit exactly once, reconcile uncertain outcomes, and render every lifecycle state clearly.
+**Goal:** Turn the existing JaldiAI foundation into a safe, production-capable Telegram-first system that can search products, prepare Blinkit/Zepto carts, obtain independent human approval, commit exactly once, reconcile uncertain outcomes, and render every lifecycle state clearly.
 
 **Architecture:** Hermes remains the conversational orchestrator. A durable transaction control plane owns proposals, state transitions, idempotency, receipts, and reconciliation. A separately deployed approval issuer authenticates the human and signs exact immutable proposal revisions; Hermes never receives the signing key or bearer authorization. Provider-specific Playwright adapters perform visible preparation and one guarded final action, with PostgreSQL and an outbox worker providing atomicity and crash recovery.
 

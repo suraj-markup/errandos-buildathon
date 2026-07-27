@@ -24,7 +24,7 @@ test -n "$zone" || { echo "n2-standard-8 unavailable in asia-south1" >&2; exit 5
 
 gcloud iam service-accounts describe "$SERVICE_ACCOUNT" --project="$PROJECT_ID" >/dev/null 2>&1 || \
   gcloud iam service-accounts create android-worker \
-    --display-name="ErrandOS Android Worker" --project="$PROJECT_ID"
+    --display-name="JaldiAI Android Worker" --project="$PROJECT_ID"
 
 for role in roles/logging.logWriter roles/monitoring.metricWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \

@@ -1,6 +1,6 @@
 # Agent-driven provider login
 
-Hermes may collect the owner's phone number and OTP in the private conversation and pass each value once through typed Blinkit or Rapido MCP login tools. ErrandOS sends them in the Android worker request on stdin. They are never placed in SSH arguments, durable state, logs, errors, screenshots, traces, or tool output.
+Hermes may collect the owner's phone number and OTP in the private conversation and pass each value once through typed Blinkit or Rapido MCP login tools. JaldiAI sends them in the Android worker request on stdin. They are never placed in SSH arguments, durable state, logs, errors, screenshots, traces, or tool output.
 
 The flow is:
 

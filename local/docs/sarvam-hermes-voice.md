@@ -1,18 +1,18 @@
 # Sarvam + Hermes voice interface
 
-ErrandOS Voice adds a multilingual speech boundary around the existing Hermes-to-ErrandOS flow:
+JaldiAI Voice adds a multilingual speech boundary around the existing Hermes-to-JaldiAI flow:
 
 ```text
 Browser microphone
   -> Sarvam Saaras v3 (speech to English + detected language)
-  -> Hermes API server (conversation, clarification, ErrandOS skill)
-  -> ErrandOS typed MCP tools (search, prepare, status, guarded commit)
+  -> Hermes API server (conversation, clarification, JaldiAI skill)
+  -> JaldiAI typed MCP tools (search, prepare, status, guarded commit)
   -> Hermes response with immutable facts marked
   -> Sarvam Translate (prose only) + Bulbul v3 (speech)
   -> localized text and audio in the browser
 ```
 
-Sarvam does not receive provider sessions, Android state, proposal capabilities, cookies, or raw ErrandOS tools. Hermes remains the intelligence layer. ErrandOS remains the transaction authority.
+Sarvam does not receive provider sessions, Android state, proposal capabilities, cookies, or raw JaldiAI tools. Hermes remains the intelligence layer. JaldiAI remains the transaction authority.
 
 ## 1. Configure Hermes
 
@@ -80,7 +80,7 @@ ERRANDOS_LIVE_BROWSER_ACTIONS=false
 ERRANDOS_LIVE_COMMIT=false
 ```
 
-Voice input is not itself a commit capability. Hermes must prepare and render the exact proposal, state that nothing has been ordered, and wait for explicit confirmation of those terms. ErrandOS still enforces proposal ownership, proposal hashes, idempotency, exact-term revalidation, at-most-once final action, and read-only reconciliation.
+Voice input is not itself a commit capability. Hermes must prepare and render the exact proposal, state that nothing has been ordered, and wait for explicit confirmation of those terms. JaldiAI still enforces proposal ownership, proposal hashes, idempotency, exact-term revalidation, at-most-once final action, and read-only reconciliation.
 
 Do not ask users to speak phone numbers or OTPs into the Sarvam voice path. Use the private typed login flow and never echo or persist those values.
 
@@ -97,10 +97,10 @@ pnpm --filter @errandos/web build
 
 Before any live canary:
 
-1. Verify Hermes lists the ErrandOS MCP tools.
+1. Verify Hermes lists the JaldiAI MCP tools.
 2. Complete one search-only voice turn in each demo language.
 3. Complete a multi-turn product clarification.
-4. Prepare a cart and verify every displayed fact against ErrandOS output.
+4. Prepare a cart and verify every displayed fact against JaldiAI output.
 5. Confirm duplicate requests reuse one idempotency key.
 6. Confirm an ambiguous result reconciles read-only and never triggers another final action.
 7. Enable reversible actions only for a supervised test.

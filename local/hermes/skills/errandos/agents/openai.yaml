@@ -1,4 +1,4 @@
 interface:
-  display_name: "ErrandOS Blinkit"
-  short_description: "Operate Blinkit orders through ErrandOS"
+  display_name: "JaldiAI Blinkit"
+  short_description: "Operate Blinkit orders through JaldiAI"
   default_prompt: "Use $errandos to check Blinkit readiness, run durable asynchronous COD preparation, handle typed checkout constraints, render exact terms, and place only after confirmation."

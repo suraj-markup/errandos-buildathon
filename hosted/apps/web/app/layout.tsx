@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'ErrandOS Voice — Speak it. Review it. Get it done.',
+  title: 'JaldiAI Voice — Speak it. Review it. Get it done.',
   description: 'A multilingual, transaction-safe voice interface for everyday errands in India.',
 };
 

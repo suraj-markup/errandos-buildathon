@@ -6,7 +6,7 @@ Assistants can understand “get groceries for dinner,” but real purchases nee
 
 ## Positioning
 
-ErrandOS is a personal operations control plane for real-world errands in India. It gives Hermes a narrow, typed, and durable way to prepare and execute provider actions without moving credentials, provider sessions, or transaction safety into the conversation layer.
+JaldiAI is a personal operations control plane for real-world errands in India. It gives Hermes a narrow, typed, and durable way to prepare and execute provider actions without moving credentials, provider sessions, or transaction safety into the conversation layer.
 
 ## User promise
 
@@ -15,11 +15,11 @@ Say what you need. Review the exact terms. Approve once. Know what happened.
 ## Demo story
 
 1. The user asks Hermes for grocery items in natural language.
-2. Hermes searches through an ErrandOS tool and resolves exact offers.
-3. ErrandOS prepares a cart proposal and returns exact prices, fees, ETA, address label, payment mode, expiry, and a proposal hash.
+2. Hermes searches through an JaldiAI tool and resolves exact offers.
+3. JaldiAI prepares a cart proposal and returns exact prices, fees, ETA, address label, payment mode, expiry, and a proposal hash.
 4. The interface makes it explicit that nothing has been ordered yet.
 5. The user approves the current immutable proposal.
-6. ErrandOS uses an idempotency key, attempts the final action at most once, and returns a verified receipt or an ambiguous state requiring read-only reconciliation.
+6. JaldiAI uses an idempotency key, attempts the final action at most once, and returns a verified receipt or an ambiguous state requiring read-only reconciliation.
 
 ## Why it is different
 

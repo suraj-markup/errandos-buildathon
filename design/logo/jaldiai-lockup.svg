@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 320" role="img" aria-labelledby="title desc">
+  <title id="title">JaldiAI</title>
+  <desc id="desc">JaldiAI wordmark with a voice waveform, microphone, and approval check.</desc>
+  <g transform="translate(18 24) scale(.53)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M40 246h30c14 0 14-52 29-52s15 104 30 104 15-70 30-70 15 38 30 38"
+      stroke="#182521"
+      stroke-width="18"
+    />
+    <rect
+      x="198"
+      y="88"
+      width="116"
+      height="222"
+      rx="58"
+      stroke="#182521"
+      stroke-width="18"
+    />
+    <path d="M170 272c0 48 38 86 86 86s86-38 86-86" stroke="#182521" stroke-width="18"/>
+    <path d="M256 358v54M210 412h92" stroke="#182521" stroke-width="18"/>
+    <path
+      d="M323 266c14 0 14-38 29-38s15 70 30 70 15-104 30-104 15 52 30 52h10"
+      stroke="#182521"
+      stroke-width="18"
+    />
+    <path d="M394 270l28 28 54-66" stroke="#E25840" stroke-width="20"/>
+  </g>
+  <text
+    x="320"
+    y="213"
+    fill="#182521"
+    font-family="'Source Serif 4', Georgia, 'Times New Roman', serif"
+    font-size="164"
+    font-weight="400"
+    letter-spacing="-6"
+  >JaldiAI</text>
+</svg>

@@ -5,9 +5,9 @@
 
 ## Objective
 
-Provide a reusable ErrandOS workflow and Agent Skills-compatible skill that lets Hermes or another tool-capable LLM operate Blinkit COD through the current persistent Android emulator on the GCP worker.
+Provide a reusable JaldiAI workflow and Agent Skills-compatible skill that lets Hermes or another tool-capable LLM operate Blinkit COD through the current persistent Android emulator on the GCP worker.
 
-The agent decides what semantic operation is needed. ErrandOS owns transaction state and exposes narrow typed tools. A provider-specific `AndroidBlinkitAdapter` owns Appium and UiAutomator2 screen interaction. Agents never receive raw device controls.
+The agent decides what semantic operation is needed. JaldiAI owns transaction state and exposes narrow typed tools. A provider-specific `AndroidBlinkitAdapter` owns Appium and UiAutomator2 screen interaction. Agents never receive raw device controls.
 
 The first release supports one owner, one Blinkit account, one saved Home location, one GCP Android worker, and COD only. Zepto, Instamart, browser execution, online payments, additional accounts, and parallel emulators are out of scope.
 
@@ -17,8 +17,8 @@ The current repository guidance still describes Playwright as the mandatory prov
 
 ```mermaid
 flowchart LR
-    U["Owner in Telegram or another interface"] --> L["Agent or LLM with ErrandOS skill"]
-    L --> M["Typed ErrandOS MCP tools"]
+    U["Owner in Telegram or another interface"] --> L["Agent or LLM with JaldiAI skill"]
+    L --> M["Typed JaldiAI MCP tools"]
     M --> T["Durable transaction workflow"]
     T --> A["AndroidBlinkitAdapter"]
     A --> W["Current GCP Android worker"]
@@ -34,11 +34,11 @@ The agent owns:
 
 - interpreting search, preparation, and ordering intent;
 - asking for missing product variants, the private phone number, or OTP;
-- choosing a typed ErrandOS tool;
+- choosing a typed JaldiAI tool;
 - rendering structured results;
 - following up on stale or ambiguous outcomes.
 
-ErrandOS owns:
+JaldiAI owns:
 
 - the owner and account binding;
 - authentication lifecycle and sensitive-value redaction;
@@ -60,7 +60,7 @@ Appium, ADB, selectors, coordinates, screenshots, UI XML, arbitrary device comma
 
 ## Agent skill
 
-The existing `hermes/skills/errandos` package remains the single user-facing ErrandOS skill. Its Blinkit path is updated from Playwright assumptions to the Android worker and gains two references:
+The existing `hermes/skills/errandos` package remains the single user-facing JaldiAI skill. Its Blinkit path is updated from Playwright assumptions to the Android worker and gains two references:
 
 ```text
 hermes/skills/errandos/
@@ -79,7 +79,7 @@ The skill maps intent to operations:
 - an OTP challenge asks for the OTP in the private owner conversation and immediately submits it;
 - an uncertain final outcome calls `blinkit_reconcile_order` and never calls the commit tool again.
 
-The skill does not teach agents how to use Appium. It teaches when to call semantic ErrandOS operations and how to present their results. The same `SKILL.md` can be loaded by Hermes or another Agent Skills-compatible runtime. Runtimes without skill loading may inject the same content as trusted system context.
+The skill does not teach agents how to use Appium. It teaches when to call semantic JaldiAI operations and how to present their results. The same `SKILL.md` can be loaded by Hermes or another Agent Skills-compatible runtime. Runtimes without skill loading may inject the same content as trusted system context.
 
 ## Typed tool contract
 
@@ -94,7 +94,7 @@ The Android Blinkit workflow exposes these semantic operations:
 - `blinkit_order_status`
 - `blinkit_reconcile_order`
 
-Existing generic ErrandOS tool names may remain as compatibility aliases only when their schemas and behavior are identical. There is no raw Appium or device-control tool.
+Existing generic JaldiAI tool names may remain as compatibility aliases only when their schemas and behavior are identical. There is no raw Appium or device-control tool.
 
 ### Authentication
 
@@ -123,9 +123,9 @@ No substitution occurs without a new owner choice. Preparation stops if COD is u
 
 `blinkit_place_cod_order` requires the proposal ID and a deterministic idempotency key derived from the originating interface event plus the proposal ID. The same proposal always reuses the same key.
 
-Before dispatch, ErrandOS re-extracts and compares all material terms: item identity, quantity, prices, fees, total, address, ETA, payment mode, and provider fingerprint. A difference returns `stale` without a final click.
+Before dispatch, JaldiAI re-extracts and compares all material terms: item identity, quantity, prices, fees, total, address, ETA, payment mode, and provider fingerprint. A difference returns `stale` without a final click.
 
-ErrandOS writes durable dispatch state before invoking the adapter's final action. The adapter must find exactly one semantic `Place Order` control and attempt it once. A duplicate key returns the existing operation rather than attempting another click.
+JaldiAI writes durable dispatch state before invoking the adapter's final action. The adapter must find exactly one semantic `Place Order` control and attempt it once. A duplicate key returns the existing operation rather than attempting another click.
 
 Commit returns one of:
 
@@ -133,7 +133,7 @@ Commit returns one of:
 - `stale` when terms changed before dispatch;
 - `committing` while a previously recorded dispatch is running;
 - `ambiguous` when the final click may have occurred but confirmation is unverified;
-- `failed` only when ErrandOS knows the final action was not attempted.
+- `failed` only when JaldiAI knows the final action was not attempted.
 
 ### Reconciliation
 

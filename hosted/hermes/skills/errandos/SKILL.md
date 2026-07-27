@@ -1,17 +1,17 @@
 ---
 name: errandos
-description: Operate the owner's Blinkit and Rapido accounts through typed ErrandOS tools. Use for private provider login, Blinkit grocery workflows, and Rapido ride workflows.
+description: Operate the owner's Blinkit and Rapido accounts through typed JaldiAI tools. Use for private provider login, Blinkit grocery workflows, and Rapido ride workflows.
 ---
 
-# ErrandOS
+# JaldiAI
 
-Use only typed provider-specific ErrandOS MCP tools. Interpret the owner's intent and present results; let ErrandOS own provider sessions, proposal hashes, idempotency, final actions, receipts, and reconciliation.
+Use only typed provider-specific JaldiAI MCP tools. Interpret the owner's intent and present results; let JaldiAI own provider sessions, proposal hashes, idempotency, final actions, receipts, and reconciliation.
 
 ## Tool boundary
 
-Call the native ErrandOS MCP tools directly. Never use the terminal, `mcporter`, `gcloud`, SSH, Appium, ADB, deployment scripts, or the Android worker command to perform or diagnose a Blinkit operation. Those are private transport and deployment details owned by ErrandOS.
+Call the native JaldiAI MCP tools directly. Never use the terminal, `mcporter`, `gcloud`, SSH, Appium, ADB, deployment scripts, or the Android worker command to perform or diagnose a Blinkit operation. Those are private transport and deployment details owned by JaldiAI.
 
-If a canonical ErrandOS tool is not initially visible and the host exposes tool discovery, search the deferred tool catalog once for its exact name. Report that the ErrandOS MCP integration is unavailable only when the canonical tool is still not callable after discovery. If a callable tool returns an error, report the exact safe error category instead; never misstate a failed provider operation as missing tools. Apply only the bounded semantic recovery documented below. Do not fall back to provider automation or cloud administration, and do not ask the owner to refresh Google Cloud authentication.
+If a canonical JaldiAI tool is not initially visible and the host exposes tool discovery, search the deferred tool catalog once for its exact name. Report that the JaldiAI MCP integration is unavailable only when the canonical tool is still not callable after discovery. If a callable tool returns an error, report the exact safe error category instead; never misstate a failed provider operation as missing tools. Apply only the bounded semantic recovery documented below. Do not fall back to provider automation or cloud administration, and do not ask the owner to refresh Google Cloud authentication.
 
 Read [references/blinkit-android-workflow.md](references/blinkit-android-workflow.md) before preparing or placing a Blinkit order. Read [references/rapido-android-workflow.md](references/rapido-android-workflow.md) before authenticating or operating Rapido. Read [references/architecture.md](references/architecture.md) when explaining proposal hashes, recovery, or uncertain outcomes. Use [references/rendering-examples.md](references/rendering-examples.md) when formatting results. See [references/sarvam-telegram-voice.md](references/sarvam-telegram-voice.md) for multilingual Sarvam voice-wrapper handling and search-retry examples.
 
@@ -70,7 +70,7 @@ Treat `blinkit_readiness` as the authoritative dependency check. It returns only
 - `unavailable` with `worker_unreachable`: report that the Android worker is unavailable and stop. Retry once only if the owner explicitly asks after connectivity is restored.
 - `unavailable` or `unknown` for Appium, emulator, or Blinkit app: report the named dependency state and stop. Do not use SSH, cloud tools, Appium, ADB, or screenshots.
 
-If another tool fails with `worker_unreachable`, `worker_execution_failed`, or `worker_response_invalid`, report that exact safe category and do not translate it into a login problem. Treat a structured `blocked` result as a reachable, successfully completed ErrandOS call—not as MCP downtime:
+If another tool fails with `worker_unreachable`, `worker_execution_failed`, or `worker_response_invalid`, report that exact safe category and do not translate it into a login problem. Treat a structured `blocked` result as a reachable, successfully completed JaldiAI call—not as MCP downtime:
 
 - `cod_minimum_not_met`: render the exact returned `itemSubtotal` and `requiredSubtotal`. Explain that nothing was ordered. Ask whether the owner wants to add or increase an item; do not retry unchanged terms.
 - `product_unavailable`: identify the requested item without inventing a substitute. Search alternatives only when requested.
@@ -87,7 +87,7 @@ Every canonical Blinkit tool can return a typed failure envelope with `status: f
 If a search or incremental add fails before producing a verified result, call `blinkit_current_screen` once:
 
 - `home`, `search`, or `search_results` with `searchAction: available`: retry the original semantic operation once.
-- a product-detail, cart, checkout, payment, address-selection, order-confirmation, order-history, location, or review screen with `searchAction: recoverable`: retry the original semantic operation once. ErrandOS performs the bounded navigation internally.
+- a product-detail, cart, checkout, payment, address-selection, order-confirmation, order-history, location, or review screen with `searchAction: recoverable`: retry the original semantic operation once. JaldiAI performs the bounded navigation internally.
 - `login` or `otp`: use the typed private authentication flow.
 - `unknown` or `searchAction: blocked`: stop and report `screen_blocked`.
 
@@ -113,7 +113,7 @@ Make a fresh `blinkit_list_saved_addresses` call in the same turn as every addre
 
 ## Share an existing cart
 
-Call `blinkit_cart_status` first. If it is empty, explain that there is no cart to share. Otherwise call `blinkit_share_cart`; ErrandOS uses Blinkit’s native Android Share action, extracts only a Blinkit-domain URL, and verifies the cart fingerprint did not change.
+Call `blinkit_cart_status` first. If it is empty, explain that there is no cart to share. Otherwise call `blinkit_share_cart`; JaldiAI uses Blinkit’s native Android Share action, extracts only a Blinkit-domain URL, and verifies the cart fingerprint did not change.
 
 Render the returned `shareUrl` exactly and warn that anyone who receives it may be able to view or recreate the cart. Do not treat the link as a proposal, approval, receipt, or order. Do not call a preparation or placement tool merely because the cart was shared.
 
@@ -186,6 +186,6 @@ Treat outcomes exactly:
 - `ambiguous`: the click may have occurred. Reconcile read-only and never place again.
 - `failed`: state that the order was not completed.
 
-Known location prompts, review prompts, and provider overlays are handled inside ErrandOS. Never try to dismiss them through a generic click, terminal, browser, Appium, ADB, coordinate, selector, screenshot, or XML tool. A typed `screen_blocked` result means bounded recovery stopped safely.
+Known location prompts, review prompts, and provider overlays are handled inside JaldiAI. Never try to dismiss them through a generic click, terminal, browser, Appium, ADB, coordinate, selector, screenshot, or XML tool. A typed `screen_blocked` result means bounded recovery stopped safely.
 
 Never expose Appium, ADB, coordinates, selectors, UI XML, screenshots, device sessions, or internal recovery actions. Never claim success without a committed result and verified provider reference.

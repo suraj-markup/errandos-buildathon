@@ -24,7 +24,7 @@ An offer can contain an optional provider-supplied `imageUrl`. Render it only wi
 If search or incremental add fails before returning a verified result, call `blinkit_current_screen` once. It returns only a sanitized screen `kind`, whether search is `available`, `recoverable`, or `blocked`, and optional safe product/cart facts. It never returns a screenshot, UI tree, selector, coordinate, or device state.
 
 - On `home`, `search`, or `search_results`, retry the original semantic operation once.
-- On a product-detail screen or another screen marked `recoverable`, retry the original semantic operation once; ErrandOS normalizes the app back to search internally.
+- On a product-detail screen or another screen marked `recoverable`, retry the original semantic operation once; JaldiAI normalizes the app back to search internally.
 - On `login` or `otp`, use the typed authentication flow.
 - On `unknown` or `blocked`, stop with `screen_blocked`.
 
@@ -121,7 +121,7 @@ Inspect the cart first and stop if it is empty. Render the complete proposal, in
 
 Call `blinkit_place_cod_order` with the prepared `proposalId` and deterministic `idempotencyKey`. Do not call it for search-only or prepare-only language.
 
-Before the final action, ErrandOS revalidates products, quantities, prices, fees, total, address, payment mode, ETA, and provider fingerprint against the proposal. Changed terms produce `stale` and no click.
+Before the final action, JaldiAI revalidates products, quantities, prices, fees, total, address, payment mode, ETA, and provider fingerprint against the proposal. Changed terms produce `stale` and no click.
 
 After the owner confirms the rendered proposal, call `blinkit_compare_proposal` before placement. `unchanged` permits the existing proposal to proceed. `changed` or `expired` forbids placement and requires a fresh rendered proposal plus new confirmation. A comparison never authorizes or places an order.
 
@@ -134,4 +134,4 @@ Never place a proposal after its `expiresAt`. Prepare and render a fresh proposa
 - On `committed`, show the verified provider reference.
 - On a recoverable pre-dispatch failure, retry only the documented semantic operation. Never improvise raw device actions.
 
-Known location prompts, review prompts, and overlays are recovered inside ErrandOS. If bounded recovery returns `screen_blocked`, stop and report that safe category. Never reach for raw clicks, screenshots, coordinates, selectors, XML, Appium, or ADB.
+Known location prompts, review prompts, and overlays are recovered inside JaldiAI. If bounded recovery returns `screen_blocked`, stop and report that safe category. Never reach for raw clicks, screenshots, coordinates, selectors, XML, Appium, or ADB.

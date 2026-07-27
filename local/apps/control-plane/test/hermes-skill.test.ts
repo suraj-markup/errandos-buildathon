@@ -15,7 +15,7 @@ const rapidoWorkflow = async (): Promise<string> =>
     'utf8',
   );
 
-describe('Hermes ErrandOS skill', () => {
+describe('Hermes JaldiAI skill', () => {
   it('uses the canonical asynchronous Blinkit preparation tools', async () => {
     const content = await skill();
 
@@ -60,7 +60,7 @@ describe('Hermes ErrandOS skill', () => {
     const content = await skill();
 
     expect(content).toContain('Never expose Appium, ADB, coordinates, selectors, UI XML, screenshots');
-    expect(content).toContain('Known location prompts, review prompts, and provider overlays are handled inside ErrandOS');
+    expect(content).toContain('Known location prompts, review prompts, and provider overlays are handled inside JaldiAI');
   });
 
   it('uses the sanitized current-screen tool for bounded semantic diagnosis', async () => {

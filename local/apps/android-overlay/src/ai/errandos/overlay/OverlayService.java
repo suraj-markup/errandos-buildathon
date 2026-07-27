@@ -111,7 +111,7 @@ public final class OverlayService extends Service {
         NotificationManager manager = getSystemService(NotificationManager.class);
         NotificationChannel channel = new NotificationChannel(
             CHANNEL_ID,
-            "ErrandOS overlay",
+            "JaldiAI overlay",
             NotificationManager.IMPORTANCE_LOW
         );
         manager.createNotificationChannel(channel);
@@ -125,7 +125,7 @@ public final class OverlayService extends Service {
         );
 
         return new Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("ErrandOS is ready")
+            .setContentTitle("JaldiAI is ready")
             .setContentText("Hold the floating button to speak")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pending)
@@ -138,7 +138,7 @@ public final class OverlayService extends Service {
         statusView = new ImageButton(this);
         statusView.setImageResource(android.R.drawable.ic_btn_speak_now);
         statusView.setColorFilter(Color.WHITE);
-        statusView.setContentDescription("ErrandOS. Press and hold to speak.");
+        statusView.setContentDescription("JaldiAI. Press and hold to speak.");
         statusView.setPadding(dp(17), dp(17), dp(17), dp(17));
         statusView.setScaleType(ImageButton.ScaleType.FIT_CENTER);
         statusView.setBackground(backgroundFor("ready"));
@@ -196,7 +196,7 @@ public final class OverlayService extends Service {
     private void startRecording() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED) {
-            setStatus("Open ErrandOS once to allow microphone access.", "error");
+            setStatus("Open JaldiAI once to allow microphone access.", "error");
             Intent permission = new Intent(this, MainActivity.class);
             permission.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(permission);
@@ -247,7 +247,7 @@ public final class OverlayService extends Service {
     private void uploadVoiceTurn() {
         HttpURLConnection connection = null;
         try {
-            String boundary = "ErrandOS" + System.currentTimeMillis();
+            String boundary = "JaldiAI" + System.currentTimeMillis();
             connection = (HttpURLConnection) new URL(VOICE_TURN_URL).openConnection();
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(90000);
@@ -356,7 +356,7 @@ public final class OverlayService extends Service {
     }
 
     private void setStatus(String message, String state) {
-        statusView.setContentDescription("ErrandOS. " + message);
+        statusView.setContentDescription("JaldiAI. " + message);
         if (Build.VERSION.SDK_INT >= 26) statusView.setTooltipText(message);
         statusView.setImageResource(iconFor(state));
         statusView.setBackground(backgroundFor(state));

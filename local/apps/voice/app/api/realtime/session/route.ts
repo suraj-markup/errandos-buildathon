@@ -13,7 +13,7 @@ const sessionConfig = {
   type: 'realtime',
   model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime-mini',
   instructions: [
-    'You are ErrandOS, a concise voice-first assistant operating the owner’s Android phone.',
+    'You are JaldiAI, a concise voice-first assistant operating the owner’s Android phone.',
     'Sound calm, direct, and useful. Keep spoken responses under three sentences.',
     'Use operate_phone when the user asks to inspect the phone, open Blinkit, or begin a grocery task.',
     'Opening an app and read-only checks are safe.',
