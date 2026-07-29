@@ -8,8 +8,12 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "dead-code:check": "pnpm --filter @errandos/voice dead-code:check",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
+    "release:offline:check": "node scripts/h092-h095-offline-release-gate.mjs --check",
+    "release:offline:report": "node scripts/h092-h095-offline-release-gate.mjs --report",
+    "release:offline:test": "node --test scripts/test/h092-h095-offline-release-gate.test.mjs && bash scripts/test/h092-preflight.test.sh && pnpm --filter @errandos/voice exec vitest run --silent=true lib/runtime-policy.test.ts lib/realtime/rollout-controller.test.ts lib/realtime/quality-report.test.ts lib/blinkit-execution.test.ts lib/phone-tool.test.ts lib/execution/v2/cart-mutation-execution-truth.test.ts lib/general-mobile/v2/android-settings-read-only-adapter.test.ts && pnpm --filter @errandos/provider-connectors exec vitest run --silent=true test/android-commit.test.ts test/blinkit-orders.test.ts",
+    "test": "pnpm -r test && pnpm dead-code:check",
     "typecheck": "pnpm -r typecheck",
     "audit": "pnpm audit --audit-level moderate"
   },

@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "taskId": "task_queuefixture01",
+  "revision": 12,
+  "status": "active",
+  "activeStepId": "task_item_potato01",
+  "steps": [
+    {
+      "adapterId": "blinkit",
+      "kind": "add_cart_item",
+      "status": "running",
+      "stepId": "task_item_potato01"
+    },
+    {
+      "adapterId": "blinkit",
+      "kind": "search_products",
+      "status": "planned",
+      "stepId": "task_item_paneer01"
+    },
+    {
+      "adapterId": "blinkit",
+      "kind": "search_products",
+      "status": "planned",
+      "stepId": "task_item_chicken1"
+    },
+    {
+      "adapterId": "blinkit",
+      "kind": "search_products",
+      "status": "planned",
+      "stepId": "task_item_rice001"
+    },
+    {
+      "adapterId": "blinkit",
+      "kind": "inspect_cart",
+      "status": "planned",
+      "stepId": "task_item_cart001"
+    }
+  ]
+}

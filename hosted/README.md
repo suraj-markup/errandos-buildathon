@@ -1,10 +1,10 @@
-# JaldiAI
+# ErrandOS
 
 [Live web interface](https://chores-ai.vercel.app/)
 
-JaldiAI is a Hermes-first personal operations control plane for real-world errands in India. Its current production slice lets one owner use natural language to search Blinkit, manage a real cart, review exact COD terms, place an explicitly requested order at most once, reconcile uncertain outcomes, and share the official cart link.
+ErrandOS is a Hermes-first personal operations control plane for real-world errands in India. Its current production slice lets one owner use natural language to search Blinkit, manage a real cart, review exact COD terms, place an explicitly requested order at most once, reconcile uncertain outcomes, and share the official cart link.
 
-Hermes owns the conversation and reasoning. JaldiAI owns provider access, durable state, transaction safety, and the final external action.
+Hermes owns the conversation and reasoning. ErrandOS owns provider access, durable state, transaction safety, and the final external action.
 
 ## Current status
 
@@ -13,7 +13,7 @@ The Blinkit Android workflow is implemented and live verified through the normal
 ```text
 Telegram / web
     → Hermes
-    → typed JaldiAI MCP tools
+    → typed ErrandOS MCP tools
     → owner VPC
     → private SSH/Tailscale connection
     → GCP Android worker
@@ -45,9 +45,9 @@ The canonical implementation roadmap and live evidence are maintained in [docs/b
 ```mermaid
 flowchart LR
     U["Owner<br/>Telegram or web"] --> H["Hermes<br/>conversation and intent"]
-    H --> S["JaldiAI Hermes skill"]
+    H --> S["ErrandOS Hermes skill"]
     S --> M["Typed MCP tools"]
-    M --> C["JaldiAI control plane"]
+    M --> C["ErrandOS control plane"]
     C <--> D["Durable state<br/>filesystem or PostgreSQL"]
     C --> Q["Per-owner/account<br/>operation serialization"]
     Q --> SSH["Restricted SSH<br/>private network"]
@@ -62,11 +62,11 @@ flowchart LR
 
 - Understand natural-language intent.
 - Ask for missing product, quantity, address, or approval information.
-- Select narrow JaldiAI tools.
+- Select narrow ErrandOS tools.
 - Render structured results as readable messages or cards.
 - Poll durable operations and continue the conversation.
 
-### JaldiAI responsibilities
+### ErrandOS responsibilities
 
 - Custody of provider account and emulator state.
 - Principal-isolated provider operations.
@@ -94,14 +94,14 @@ Hermes renders the exact terms and proposal hash
     ↓
 Owner explicitly asks to place those terms
     ↓
-JaldiAI revalidates the provider fingerprint and idempotency key
+ErrandOS revalidates the provider fingerprint and idempotency key
     ↓
 One final provider action is attempted at most once
     ↓
 Verified receipt, blocked result, or ambiguous reconciliation state
 ```
 
-Preparation never places an order. If a final action times out or cannot be verified, JaldiAI records an `ambiguous` result and reconciles using read-only provider history. It never blindly repeats the final action.
+Preparation never places an order. If a final action times out or cannot be verified, ErrandOS records an `ambiguous` result and reconciles using read-only provider history. It never blindly repeats the final action.
 
 ## Canonical Hermes tools
 
@@ -161,7 +161,7 @@ Legacy generic transaction handlers remain available only when `ERRANDOS_MCP_LEG
 
 ## Safety and transaction invariants
 
-JaldiAI treats paid external actions as transactions rather than chat replies.
+ErrandOS treats paid external actions as transactions rather than chat replies.
 
 1. Search and status reads are safe.
 2. Cart editing and grocery/ride preparation may operate the official app but must stop before the final order or ride-request action.
@@ -172,7 +172,7 @@ JaldiAI treats paid external actions as transactions rather than chat replies.
 7. Materially changed terms require a new proposal.
 8. An unverified final result becomes `ambiguous` and enters read-only reconciliation.
 9. OTPs are accepted only through typed login tools and are never echoed, persisted, traced, or returned.
-10. MCP never exposes Appium, ADB, selectors, coordinates, UI XML, screenshots, cookies, session paths, or arbitrary device commands.
+10. MCP never exposes Appium, ADB, selectors, coordinates, UI XML, cookies, session paths, or arbitrary device commands. Screenshots remain internal except for the separately gated personal owner-only post-order evidence flow described below.
 11. Success is reported only when a verified provider reference or committed receipt exists.
 
 Two independent kill switches protect live execution:
@@ -192,6 +192,14 @@ ERRANDOS_TRUSTED_AUTONOMOUS_COD=true
 ```
 
 This removes the external approval-capability step only for Blinkit COD. Proposal hashing, exact-term revalidation, idempotency, at-most-once dispatch, receipts, and reconciliation remain mandatory.
+
+For a single trusted owner who explicitly wants visual proof after a verified order, enable:
+
+```text
+ERRANDOS_OWNER_ORDER_EVIDENCE=true
+```
+
+This is valid only with `ERRANDOS_DEPLOYMENT_PROFILE=personal`. After a durable `committed` result with a verified provider reference, a separate restricted media helper may send the raw Blinkit confirmation, tracking, or delivered screen to the configured owner's private Telegram DM. It is not an MCP screenshot tool. It must refuse login, OTP, password, payment-credential, bank-challenge, group, and unverified-order contexts; use a short-lived owner-only file; and delete the file after delivery.
 
 ## Repository layout
 
@@ -299,6 +307,26 @@ Place the exact prepared COD order.
 
 The cart-sharing request returns the official Blinkit URL but does not prepare or place an order.
 
+### Direct-use public cart handoff
+
+For a buildathon or limited public beta, run a separate cart-only Hermes/MCP
+profile using [hermes/mcp.public-cart.example.yaml](hermes/mcp.public-cart.example.yaml)
+and set `ERRANDOS_PUBLIC_CART_HANDOFF=true` on the web process. The public MCP
+surface advertises only Blinkit readiness, search, clear, add, sanitized screen
+recovery, and native share tools. Login, saved addresses, order history,
+checkout preparation, reconciliation, and every final action are absent.
+
+The mobile web flow serializes each agent turn, validates the returned URL
+against the Blinkit HTTPS domain, and renders an **Open in Blinkit** handoff.
+The visitor completes location, price, delivery, payment, and checkout review
+inside their own official Blinkit app. This mode must run as one web process
+until a durable distributed queue replaces the in-process serializer.
+
+Do not expose an owner's personal provider account to untrusted visitors. Use
+it only for a supervised commit-disabled demo; an open deployment needs a
+dedicated public Android worker and cart-building account, ingress rate
+limiting, and provider policy review.
+
 ## Multilingual voice interface
 
 The web app can use Sarvam for Indic speech recognition, fact-preserving translation, and speech generation while Hermes remains the conversation and tool-orchestration layer. See [docs/sarvam-hermes-voice.md](docs/sarvam-hermes-voice.md) for setup, architecture, safety boundaries, and the demo checklist.
@@ -319,7 +347,7 @@ Never expose these values through browser bundles.
 
 Blinkit runs only through the provider-specific `AndroidBlinkitAdapter`, which operates the official app in a principal-isolated persistent emulator. Playwright is not an active Blinkit runtime.
 
-JaldiAI does not:
+ErrandOS does not:
 
 - Reverse-engineer private provider APIs.
 - Intercept provider traffic.

@@ -1,5 +1,5 @@
 [Unit]
-Description=JaldiAI local-only Appium
+Description=ErrandOS local-only Appium
 After=errandos-emulator.service
 Requires=errandos-emulator.service
 

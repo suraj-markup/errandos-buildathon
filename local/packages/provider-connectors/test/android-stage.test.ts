@@ -26,4 +26,13 @@ describe('Blinkit Android stage detection', () => {
   it('recognizes the live checkout variant before a payment option is selected', () => {
     expect(detectBlinkitAndroidStage('<hierarchy><node text="Shipment of 2 items"/><node text="Delivering to Home"/><node text="Select payment option"/></hierarchy>')).toBe('checkout');
   });
+
+  it('recognizes the current storefront shell from stable navigation resource IDs', () => {
+    expect(detectBlinkitAndroidStage([
+      '<hierarchy>',
+      '<node resource-id="com.grofers.customerapp:id/z_search_bar" content-desc="Search"/>',
+      '<node resource-id="com.grofers.customerapp:id/bottom_nav_bar"/>',
+      '</hierarchy>',
+    ].join(''))).toBe('storefront');
+  });
 });

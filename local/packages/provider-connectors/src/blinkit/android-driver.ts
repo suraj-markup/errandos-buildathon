@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { AndroidCheckoutReviewSchemaV1, AndroidImportedCartSchemaV1, AndroidSharedCartSchemaV1, BlinkitShareUrlSchemaV1, type AndroidCartReviewV1, type AndroidCheckoutReviewV1, type AndroidCurrentScreenV1, type AndroidExpectedCheckoutV1, type AndroidImportedCartV1, type AndroidRecentOrderV1, type AndroidSavedAddressV1, type AndroidSharedCartV1, type BlinkitCartImportBehaviorV1 } from '@errandos/contracts';
 import type { AndroidUiPort, UiElement } from '../android/appium-client.js';
+import {
+  SemanticConditionTimeoutError,
+  waitForSemanticCondition,
+} from '../android/adaptive-semantic-wait.js';
+import { AndroidCartMutationVerificationError } from '../android/cart-mutation-verification.js';
 import { BoundedScreenRecovery, KnownScreenRecoveryPlanner, type ScreenRecoveryPort } from '../android/screen-recovery.js';
 import type { AndroidOrderCandidate } from './android-commit.js';
 import { detectBlinkitAndroidStage, type BlinkitAndroidStage } from './android-stage.js';
@@ -24,11 +29,31 @@ export interface AndroidSearchOffer {
   imageUrl?: string;
 }
 
+export interface AndroidVisibleCartUpsert {
+  before?: AndroidCartReviewV1;
+  cart: AndroidCartReviewV1;
+  changed: boolean;
+}
+
+export class BlinkitOfferSelectionStaleError extends Error {
+  public override readonly name = 'BlinkitOfferSelectionStaleError';
+  public readonly code = 'offer_selection_stale' as const;
+  public readonly requiresReselection = true as const;
+
+  public constructor(
+    public readonly offerId: string,
+    options: ErrorOptions = {},
+  ) {
+    super('The accepted Blinkit offer is no longer visible; reselection is required.', options);
+  }
+}
+
 interface AndroidSearchCandidate extends AndroidSearchOffer {
   providerLocator: string;
 }
 
 export interface BlinkitAndroidDriverOptions {
+  now?: () => number;
   wait?: (milliseconds: number) => Promise<void>;
   pollAttempts?: number;
   recovery?: ScreenRecoveryPort;
@@ -38,6 +63,9 @@ type AttributeMap = Record<string, string>;
 
 const money = (amount: number): { currency: 'INR'; amount: number } => ({ currency: 'INR', amount });
 const minor = (amount: number): number => Math.round(amount * 100);
+const QUICK_TRANSITION_DEADLINE_MS = 1_500;
+const NAVIGATION_TRANSITION_DEADLINE_MS = 2_500;
+const MUTATION_TRANSITION_DEADLINE_MS = 3_000;
 const SAVED_ADDRESS_STAGNANT_PAGE_LIMIT = 1;
 const SAVED_ADDRESS_RESOURCE_IDS = [
   'com.grofers.customerapp:id/address_type',
@@ -51,11 +79,13 @@ const savedAddressPageSignature = (addresses: readonly AndroidSavedAddressV1[]):
   .join('|');
 
 export class BlinkitAndroidDriver {
+  private readonly now: () => number;
   private readonly wait: (milliseconds: number) => Promise<void>;
   private readonly pollAttempts: number;
   private readonly recovery: ScreenRecoveryPort;
 
   public constructor(private readonly ui: AndroidUiPort, options: BlinkitAndroidDriverOptions = {}) {
+    this.now = options.now ?? Date.now;
     this.wait = options.wait ?? ((milliseconds): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.pollAttempts = options.pollAttempts ?? 20;
     this.recovery = options.recovery ?? new BoundedScreenRecovery(ui, new KnownScreenRecoveryPlanner(), { wait: this.wait });
@@ -216,7 +246,10 @@ export class BlinkitAndroidDriver {
       stagnantPages = addresses.size === previousSize ? stagnantPages + 1 : 0;
       if (stagnantPages >= SAVED_ADDRESS_STAGNANT_PAGE_LIMIT) break;
       if (!await this.advanceSavedAddressBook()) break;
-      visibleAddresses = await this.readVisibleSavedAddresses(savedAddressPageSignature(visibleAddresses));
+      visibleAddresses = await this.waitForSavedAddressPageChange(
+        savedAddressPageSignature(visibleAddresses),
+        'address_advance',
+      );
     }
     return [...addresses.values()];
   }
@@ -234,8 +267,10 @@ export class BlinkitAndroidDriver {
       ))) {
         const scrolled = await this.ui.scrollElementBackward(container).catch(() => false);
         if (!scrolled) continue;
-        await this.wait(300);
-        const previousAddresses = await this.readVisibleSavedAddresses(previousSignature);
+        const previousAddresses = await this.waitForSavedAddressPageChange(
+          previousSignature,
+          'address_rewind',
+        );
         const signature = savedAddressPageSignature(previousAddresses);
         stagnantPages = signature === previousSignature ? stagnantPages + 1 : 0;
         visibleAddresses = previousAddresses;
@@ -258,12 +293,10 @@ export class BlinkitAndroidDriver {
       ))) {
         const scrolled = await this.ui.scrollElementForward(container).catch(() => false);
         if (!scrolled) continue;
-        await this.wait(300);
         return true;
       }
     }
     const scrolled = await this.ui.scrollForward().catch(() => false);
-    if (scrolled) await this.wait(300);
     return scrolled;
   }
 
@@ -303,12 +336,20 @@ export class BlinkitAndroidDriver {
       } else if (screen.kind === 'product_detail') {
         const usedVisibleBack = await this.activateSemanticLabel(['Navigate up', 'Go back'], source);
         if (!usedVisibleBack) {
+          const before = source;
           await this.ui.back();
-          await this.wait(500);
+          source = (await this.waitForSourceTransition(
+            'address_product_detail_exit',
+            before,
+          )).source;
         }
       } else {
+        const before = source;
         await this.ui.back();
-        await this.wait(500);
+        source = (await this.waitForSourceTransition(
+          'address_screen_exit',
+          before,
+        )).source;
       }
       source = await this.safeSource('address_list');
     }
@@ -328,21 +369,24 @@ export class BlinkitAndroidDriver {
       const uniquePaymentSelectors = uniqueElements(paymentSelectors);
       if (uniquePaymentSelectors.length === 1) {
         await this.ui.click(uniquePaymentSelectors[0]!);
-        await this.wait(500);
-        matches = await this.cashOnDeliveryTargets();
+        matches = await this.waitForCashOnDeliveryTargets(
+          'payment_options_open',
+        );
       } else if (uniquePaymentSelectors.length > 1 || !isPaymentSurface(await this.safeSource('payment_select'))) {
         throw new Error('Blinkit payment_open failed');
       }
     }
     if (matches.length === 0) {
       await this.ui.scrollExactTextIntoView('Pay On Delivery').catch(() => undefined);
-      await this.wait(1_500);
-      matches = await this.cashOnDeliveryTargets();
+      matches = await this.waitForCashOnDeliveryTargets(
+        'payment_cod_scroll_exact',
+      );
     }
     for (let attempt = 0; matches.length === 0 && attempt < 5; attempt += 1) {
       const canContinue = await this.ui.scrollForward().catch(() => false);
-      await this.wait(1_500);
-      matches = await this.cashOnDeliveryTargets();
+      matches = await this.waitForCashOnDeliveryTargets(
+        'payment_cod_scroll_forward',
+      );
       if (!canContinue && matches.length === 0) break;
     }
     const paymentSource = await this.safeSource('payment_select');
@@ -358,20 +402,13 @@ export class BlinkitAndroidDriver {
       const stalled = await this.safeSource('payment_return');
       if (!isPaymentSurface(stalled)) throw new Error('Blinkit payment_return failed');
       await this.ui.back();
-      await this.wait(500);
       try {
         await this.waitForStage(['checkout']);
       } catch {
         throw new Error('Blinkit payment_return failed');
       }
     }
-    for (let attempt = 0; attempt < this.pollAttempts; attempt += 1) {
-      const source = await this.safeSource('payment_select');
-      this.throwIfCodMinimumBlocked(source, itemSubtotal);
-      if (hasCashOnDeliveryEvidence(source)) return;
-      await this.wait(500);
-    }
-    throw new Error('Blinkit payment_verify failed');
+    await this.waitForCashOnDeliveryVerification(itemSubtotal);
   }
 
   private throwIfCodMinimumBlocked(source: string, itemSubtotal?: number): void {
@@ -387,13 +424,13 @@ export class BlinkitAndroidDriver {
       if (matches.length > 1) throw new Error('Blinkit cart_open failed');
       if (matches.length === 1) {
         await this.ui.click(matches[0]!);
-        await this.wait(1_500);
         await this.waitForStage(['checkout'], 4);
         return;
       }
       if (attempt < 3) {
+        const before = await this.safeSource('cart_open');
         await this.ui.back();
-        await this.wait(500);
+        await this.waitForSourceTransition('cart_open_back', before);
       }
     }
     throw new Error('Blinkit cart_open failed');
@@ -408,17 +445,31 @@ export class BlinkitAndroidDriver {
         screen = { stage, source: await this.safeSource('cart_inspect') };
       }
       if (stage === 'storefront') {
-        const semanticTargets = semanticTargetRects(screen.source, 'View cart');
+        let semanticTargets = semanticTargetRects(screen.source, 'View cart');
+        let targets: UiElement[] | undefined;
+        if (
+          semanticTargets.length === 0
+          && hasFocusedEditable(screen.source)
+        ) {
+          await this.ui.back();
+          screen = await this.waitForRecognizedScreen('cart_inspect');
+          stage = screen.stage;
+          if (stage !== 'storefront') {
+            return stage === 'checkout'
+              ? parseLiveAndroidCart(screen.source)
+              : undefined;
+          }
+          semanticTargets = semanticTargetRects(screen.source, 'View cart');
+        }
         if (semanticTargets.length > 1) throw new Error('Blinkit cart_open failed');
         if (semanticTargets.length === 1 && this.ui.tapRect) {
           await this.ui.tapRect(semanticTargets[0]!);
         } else {
-          const targets = await this.cartTargets();
+          targets = await this.cartTargets();
           if (targets.length === 0) return undefined;
           if (targets.length > 1) throw new Error('Blinkit cart_open failed');
           await this.ui.click(targets[0]!);
         }
-        await this.wait(1_500);
         screen = await this.waitForStageScreen(['checkout'], 4);
       } else {
         await this.openCart();
@@ -429,6 +480,53 @@ export class BlinkitAndroidDriver {
       if (error instanceof Error && /^Blinkit [a-z][a-z0-9_]+ failed$/.test(error.message)) throw error;
       throw new Error('Blinkit cart_inspect failed');
     }
+  }
+
+  public async inspectCartPreservingVisibleOffer(
+    offer: AndroidSearchOffer,
+  ): Promise<AndroidCartReviewV1 | undefined> {
+    const initialScreen = await this.waitForRecognizedScreen(
+      'cart_baseline_inspect',
+    );
+    const initialCandidates = parseSearchCandidates(initialScreen.source);
+    if (
+      initialScreen.stage !== 'storefront'
+      || !matchingVisibleOffer(initialCandidates, offer)
+    ) {
+      throw new Error('Blinkit cart_baseline_restore failed');
+    }
+
+    let cart: AndroidCartReviewV1 | undefined;
+    let inspectionError: unknown;
+    try {
+      cart = await this.inspectCart();
+    } catch (error) {
+      inspectionError = error;
+    }
+
+    try {
+      let restoredScreen = await this.waitForRecognizedScreen(
+        'cart_baseline_restore',
+      );
+      if (restoredScreen.stage === 'checkout') {
+        await this.ui.back();
+        restoredScreen = await this.waitForStageScreen(['storefront']);
+      }
+      const restoredCandidates = parseSearchCandidates(restoredScreen.source);
+      if (
+        restoredScreen.stage !== 'storefront'
+        || !matchingVisibleOffer(restoredCandidates, offer)
+        || searchCandidateSurfaceFingerprint(restoredCandidates)
+          !== searchCandidateSurfaceFingerprint(initialCandidates)
+      ) {
+        throw new Error('Blinkit cart_baseline_restore failed');
+      }
+    } catch {
+      throw new Error('Blinkit cart_baseline_restore failed');
+    }
+
+    if (inspectionError) throw inspectionError;
+    return cart;
   }
 
   public async shareCart(): Promise<AndroidSharedCartV1> {
@@ -463,11 +561,14 @@ export class BlinkitAndroidDriver {
           .filter(({ clickable }) => clickable));
       }
       if (uniqueShareTargets.length !== 1) throw new Error('Blinkit cart_share_control failed');
+      const beforeShareSource = source;
       await this.ui.click(uniqueShareTargets[0]!);
       shareOpened = true;
-      await this.wait(700);
 
-      let shareSource = await this.safeSource('cart_share');
+      let shareSource = await this.waitForShareSurface(
+        beforeShareSource,
+        'cart_share_open',
+      );
       if (hasExactSemanticLabel(shareSource, 'Share your cart')) {
         let confirmed = await this.activateSemanticLabel(['Share your cart'], shareSource);
         if (!confirmed) {
@@ -475,7 +576,10 @@ export class BlinkitAndroidDriver {
             .filter(({ clickable }) => clickable));
           if (confirmationTargets.length === 1) {
             await this.ui.click(confirmationTargets[0]!);
-            await this.wait(500);
+            shareSource = await this.waitForShareSurface(
+              shareSource,
+              'cart_share_confirm',
+            );
             confirmed = true;
           }
         }
@@ -494,13 +598,12 @@ export class BlinkitAndroidDriver {
             .filter(({ clickable }) => clickable));
           if (copyTargets.length === 1) {
             await this.ui.click(copyTargets[0]!);
-            await this.wait(300);
             copied = true;
           }
         }
         if (!copied) throw new Error('Blinkit cart_share_copy failed');
         try {
-          shareUrl = extractBlinkitShareUrl(await this.ui.readClipboardText());
+          shareUrl = await this.waitForClipboardShareUrl();
         } finally {
           await this.ui.clearClipboard().catch(() => undefined);
         }
@@ -511,8 +614,7 @@ export class BlinkitAndroidDriver {
       let after = parseLiveAndroidCart(shareSource);
       for (let attempt = 0; !after && attempt < 3; attempt += 1) {
         await this.ui.back();
-        await this.wait(500);
-        shareSource = await this.safeSource('cart_share_verify');
+        shareSource = await this.waitForCartSurface('cart_share_verify');
         after = parseLiveAndroidCart(shareSource);
       }
       shareOpened = false;
@@ -529,7 +631,7 @@ export class BlinkitAndroidDriver {
           const source = await this.safeSource('cart_share_recover').catch(() => undefined);
           if (source && parseLiveAndroidCart(source)) break;
           await this.ui.back().catch(() => undefined);
-          await this.wait(300);
+          await this.waitForCartSurface('cart_share_recover').catch(() => undefined);
         }
       }
       if (error instanceof Error && /^Blinkit [a-z][a-z0-9_]+ failed$/.test(error.message)) throw error;
@@ -543,14 +645,14 @@ export class BlinkitAndroidDriver {
     if (!this.ui.openBlinkitLink) throw new Error('Blinkit cart_import_unavailable failed');
     try {
       const before = await this.inspectCart();
+      const beforeOpenSource = await this.safeSource('cart_import_source');
       try {
         await this.ui.openBlinkitLink(parsedUrl.data);
       } catch {
         throw new Error('Blinkit cart_import_open failed');
       }
-      await this.wait(1_500);
 
-      let source = await this.safeSource('cart_import_source');
+      let source = await this.waitForImportSurface(beforeOpenSource);
       const importPromptLabels = ['Add all items to cart', 'Add items to cart', 'Add all items', 'Import cart'];
       let confirmedImportPrompt = false;
       if (importPromptLabels.some((label) => hasExactSemanticLabel(source, label))) {
@@ -612,6 +714,68 @@ export class BlinkitAndroidDriver {
     }
   }
 
+  public async upsertVisibleCartItem(
+    offer: AndroidSearchOffer,
+    quantity: number,
+    checkpoints: {
+      onCartInspectionStarted?: () => Promise<void> | void;
+      onMutationStarted?: () => Promise<void> | void;
+      onVerificationStarted?: () => Promise<void> | void;
+    } = {},
+  ): Promise<AndroidVisibleCartUpsert> {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+      throw new Error('Blinkit cart_item_upsert failed');
+    }
+    try {
+      const initialCandidates = parseSearchCandidates(
+        await this.safeSource('cart_item_visible'),
+      );
+      const chosen = matchingVisibleOffer(initialCandidates, offer);
+      if (!chosen) throw new BlinkitOfferSelectionStaleError(offer.offerId);
+
+      const matchesChosen = (line: AndroidCartReviewV1['lines'][number]): boolean => (
+        normalizeSearchText(line.name) === normalizeSearchText(chosen.title)
+        && minor(line.unitPrice.amount) === minor(chosen.price.amount)
+      );
+      let mutationError: unknown;
+      try {
+        await checkpoints.onMutationStarted?.();
+        await this.setCartQuantity(chosen.providerLocator, quantity);
+      } catch (error) {
+        if (
+          !(error instanceof Error)
+          || !/^Blinkit cart_quantity_(?:variant|verify) failed$/.test(error.message)
+        ) throw error;
+        mutationError = error;
+      }
+      await checkpoints.onVerificationStarted?.();
+      let after: AndroidCartReviewV1 | undefined;
+      let inspectionError: unknown;
+      try {
+        await checkpoints.onCartInspectionStarted?.();
+        after = await this.inspectCart();
+        const selected = after?.lines.filter(matchesChosen) ?? [];
+        if (selected.length === 1 && selected[0]!.quantity === quantity) {
+          return {
+            cart: after!,
+            changed: true,
+          };
+        }
+      } catch (error) {
+        inspectionError = error;
+      }
+      throw new AndroidCartMutationVerificationError(after, {
+        cause: mutationError ?? inspectionError,
+      });
+    } catch (error) {
+      if (error instanceof BlinkitOfferSelectionStaleError) throw error;
+      if (error instanceof Error && /^Blinkit [a-z][a-z0-9_]+ failed$/.test(error.message)) {
+        throw error;
+      }
+      throw new Error('Blinkit cart_item_upsert failed');
+    }
+  }
+
   public async setExistingCartItemQuantity(productId: string, quantity: number): Promise<AndroidCartReviewV1 | undefined> {
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) throw new Error('Blinkit cart_item_quantity failed');
     return this.editExistingCartItem(productId, quantity);
@@ -653,16 +817,32 @@ export class BlinkitAndroidDriver {
   }
 
   private async waitForCartItemQuantity(productId: string, expectedQuantity: number): Promise<AndroidCartReviewV1 | undefined> {
-    for (let attempt = 0; attempt < this.pollAttempts; attempt += 1) {
-      let cart: AndroidCartReviewV1 | undefined;
-      try {
-        cart = parseLiveAndroidCart(await this.safeSource('cart_item_verify'));
-      } catch {
-        cart = undefined;
-      }
-      const line = cart?.lines.find((candidate) => candidate.productId === productId);
-      if ((expectedQuantity === 0 && !line) || line?.quantity === expectedQuantity) return cart;
-      if (attempt + 1 < this.pollAttempts) await this.wait(250);
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: () => this.safeSource('cart_item_verify'),
+        deadlineMs: Math.max(1, this.pollAttempts * 500),
+        evaluate: (source) => {
+          const cart = parseLiveAndroidCart(source);
+          const line = cart?.lines.find((candidate) => candidate.productId === productId);
+          return (expectedQuantity === 0 && !line)
+            || line?.quantity === expectedQuantity
+            ? { satisfied: true, value: cart }
+            : {
+                satisfied: false,
+                reason: cart
+                  ? 'cart_quantity_not_updated'
+                  : 'cart_unavailable',
+              };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: this.pollAttempts,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: 'cart_item_quantity_verify',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
     }
     throw new Error('Blinkit cart_item_verify failed');
   }
@@ -732,9 +912,12 @@ export class BlinkitAndroidDriver {
     for (let recovery = 0; recovery < 3; recovery += 1) {
       const stage = detectBlinkitAndroidStage(source);
       if (stage === 'checkout' || stage === 'storefront') break;
+      const before = source;
       await this.ui.back();
-      await this.wait(300);
-      source = await this.safeSource('cart_clear');
+      source = (await this.waitForSourceTransition(
+        'cart_clear_recovery',
+        before,
+      )).source;
     }
     if (detectBlinkitAndroidStage(source) === 'storefront') {
       if ((await this.cartTargets()).length === 0) return;
@@ -750,8 +933,16 @@ export class BlinkitAndroidDriver {
         }
         return;
       }
+      const before = await this.safeSource('cart_clear');
       await this.ui.click(decreases[0]!);
-      await this.wait(200);
+      const transition = await this.waitForSourceTransition(
+        'cart_clear_decrement',
+        before,
+        MUTATION_TRANSITION_DEADLINE_MS,
+      );
+      if (!transition.changed) {
+        throw new Error('Blinkit cart_clear failed');
+      }
     }
     throw new Error('Blinkit cart_clear failed');
   }
@@ -781,60 +972,49 @@ export class BlinkitAndroidDriver {
         let entries = await this.waitForSearchEntry();
         for (let recovery = 0; entries.length === 0 && recovery < 3; recovery += 1) {
           await this.ui.back();
-          await this.wait(500);
-          source = await this.safeSource('search');
+          source = await this.waitForSearchSurface('search_back_recovery', 500);
           if (isSearchSurface(source)) break;
           entries = await this.waitForSearchEntry();
         }
         if (!isSearchSurface(source)) {
           if (entries.length !== 1) throw new Error('missing search entry');
           await this.ui.click(entries[0]!);
-          await this.wait(500);
-          source = await this.safeSource('search');
+          source = await this.waitForSearchSurface('search_entry_navigation', 500);
           if (!isSearchSurface(source)) {
             const storefrontFields = await this.ui.findClassName('android.widget.EditText');
             if (storefrontFields.length !== 1) throw new Error('missing storefront search field');
             await this.ui.click(storefrontFields[0]!);
-            for (let attempt = 0; attempt < 5; attempt += 1) {
-              await this.wait(500);
-              source = await this.safeSource('search');
-              if (isSearchSurface(source)) break;
-            }
+            source = await this.waitForSearchSurface('dedicated_search_navigation', 2_500);
             if (!isSearchSurface(source)) throw new Error('missing dedicated search surface');
           }
         }
       }
-      let fields: UiElement[] = [];
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        fields = await this.ui.findClassName('android.widget.EditText');
-        if (fields.length > 0) break;
-        await this.wait(500);
-      }
+      let fields = await this.waitForSearchField('search_field', 5);
       for (let recovery = 0; fields.length === 0 && recovery < 2; recovery += 1) {
         let targets = await this.searchEntryTargets();
         if (targets.length === 0 && isSearchSurface(await this.safeSource('search'))) {
           await this.ui.back();
-          await this.wait(500);
-          targets = await this.searchEntryTargets();
+          targets = await this.waitForSearchEntry(500);
         }
         if (targets.length !== 1) break;
         await this.ui.click(targets[0]!);
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          fields = await this.ui.findClassName('android.widget.EditText');
-          if (fields.length > 0) break;
-          await this.wait(500);
-        }
+        fields = await this.waitForSearchField('search_field_recovery', 5);
       }
       if (fields.length === 0) throw new Error('missing search field');
       await this.ui.clear(fields[0]!);
       await this.ui.setValue(fields[0]!, query);
-      await this.wait(1_500);
-      source = await this.safeSource('search');
-      let candidates = relevantSearchCandidates(query, parseSearchCandidates(source));
+      let candidates = await this.waitForSearchCandidates(
+        query,
+        'search_results_after_input',
+        8,
+      );
       if (candidates.length === 0) {
         await this.ui.pressKey('ENTER');
-        await this.wait(1_000);
-        candidates = relevantSearchCandidates(query, parseSearchCandidates(await this.safeSource('search')));
+        candidates = await this.waitForSearchCandidates(
+          query,
+          'search_results_after_submit',
+          5,
+        );
       }
       return candidates.slice(0, limit);
     } catch {
@@ -849,6 +1029,7 @@ export class BlinkitAndroidDriver {
       const cards = await this.ui.findExactDescription(description);
       const card = uniquelyDominantElement(cards);
       if (!card) throw new Error('Blinkit cart_quantity_card failed');
+      const initialLabels = await this.productLabels(description);
 
       let add: UiElement[] = [];
       for (let attempt = 0; attempt <= 20; attempt += 1) {
@@ -857,52 +1038,103 @@ export class BlinkitAndroidDriver {
         if (add.length === 1) break;
         const decrease = controlsForLabel(card, await this.ui.findExactDescription('Decrease quantity'));
         if (decrease.length === 1) {
+          const before = await this.safeSource('cart_quantity');
           await this.ui.click(decrease[0]!);
-          await this.wait(200);
+          await this.waitForControlOrSourceChange(
+            'cart_quantity_decrement',
+            before,
+            async () => within(
+              card,
+              await this.ui.findExactDescription('ADD'),
+            ).length === 1,
+          );
           continue;
         }
         add = controlsForLabel(card, addControls);
         if (add.length === 1) break;
         if (attempt === 20) throw new Error('Blinkit cart_quantity_add failed');
       }
-      await this.ui.click(add[0]!);
-      await this.wait(500);
-
-      let activeCard = card;
-      let decreases = controlsForLabel(activeCard, await this.ui.findExactDescription('Decrease quantity'));
-      if (decreases.length === 0) {
-        const variantAdds = await this.ui.findExactDescription('ADD');
-        const variantCards = (await this.ui.findExactDescription(description))
-          .map((candidate) => ({ candidate, adds: controlsForLabel(candidate, variantAdds) }))
-          .filter(({ adds }) => adds.length === 1);
-        if (variantCards.length !== 1) throw new Error('Blinkit cart_quantity_variant failed');
-        activeCard = variantCards[0]!.candidate;
-        await this.ui.click(variantCards[0]!.adds[0]!);
-        await this.wait(500);
+      const initialAdd = add[0]!;
+      await this.ui.click(initialAdd);
+      const postAdd = await this.waitForPostAddControl(
+        description,
+        initialAdd,
+        initialLabels,
+      );
+      let quantityControl = postAdd?.kind === 'quantity'
+        ? postAdd.match
+        : undefined;
+      if (!quantityControl) {
+        const variantControl = postAdd?.kind === 'variant'
+          ? postAdd.match
+          : undefined;
+        if (!variantControl) throw new Error('Blinkit cart_quantity_variant failed');
+        await this.ui.click(variantControl.control);
+        quantityControl = await this.waitForProductControl(
+          description,
+          'Decrease quantity',
+          'cart_quantity_variant_selected',
+        );
       }
-      const quantityDecreases = await this.ui.findExactDescription('Decrease quantity');
-      const quantityCards = (await this.ui.findExactDescription(description))
-        .map((candidate) => ({ candidate, decreases: controlsForLabel(candidate, quantityDecreases) }))
-        .filter(({ decreases: controls }) => controls.length === 1);
-      if (quantityCards.length === 1) {
-        activeCard = quantityCards[0]!.candidate;
-        decreases = quantityCards[0]!.decreases;
-      } else {
-        decreases = controlsForLabel(activeCard, quantityDecreases);
-      }
-      if (decreases.length !== 1) throw new Error('Blinkit cart_quantity_verify failed');
+      if (!quantityControl) throw new Error('Blinkit cart_quantity_verify failed');
 
       for (let count = 1; count < quantity; count += 1) {
-        const increase = controlsForLabel(activeCard, await this.ui.findExactDescription('Increase quantity'));
-        if (increase.length !== 1) throw new Error('Blinkit cart_quantity_increase failed');
-        await this.ui.click(increase[0]!);
-        await this.wait(200);
+        const increase = await this.uniqueProductControl(description, 'Increase quantity');
+        if (!increase) throw new Error('Blinkit cart_quantity_increase failed');
+        const before = await this.safeSource('cart_quantity');
+        await this.ui.click(increase.control);
+        const transition = await this.waitForSourceTransition(
+          'cart_quantity_increment',
+          before,
+          MUTATION_TRANSITION_DEADLINE_MS,
+        );
+        if (!transition.changed) {
+          throw new Error('Blinkit cart_quantity_verify failed');
+        }
       }
       return;
     }
     const controls = await this.ui.findResourceId(productId);
     if (controls.length !== 1) throw new Error('Blinkit cart_quantity failed');
     for (let count = 0; count < quantity; count += 1) await this.ui.click(controls[0]!);
+  }
+
+  private async productLabels(description: string): Promise<UiElement[]> {
+    const title = productTitleFromAvailabilityDescription(description);
+    return uniqueElements([
+      ...(await this.ui.findExactDescription(description)),
+      ...(title ? await this.ui.findExactDescription(title) : []),
+      ...(title ? await this.ui.findExactText(title) : []),
+    ]);
+  }
+
+  private async uniqueProductControl(
+    description: string,
+    controlDescription: 'ADD' | 'Decrease quantity' | 'Increase quantity',
+    exclusions: {
+      excludedControls?: readonly UiElement[];
+      excludedLabels?: readonly UiElement[];
+    } = {},
+  ): Promise<{ label: UiElement; control: UiElement } | undefined> {
+    const labels = (await this.productLabels(description)).filter((label) => (
+      !(exclusions.excludedLabels ?? []).some((candidate) => sameVisualTarget(candidate, label))
+    ));
+    const controls = uniqueElements(await this.ui.findExactDescription(controlDescription)).filter((control) => (
+      !(exclusions.excludedControls ?? []).some((candidate) => sameVisualTarget(candidate, control))
+    ));
+    const associations = labels.flatMap((label) => (
+      controlsForLabel(label, controls).map((control) => ({ label, control }))
+    ));
+    const uniqueControls = uniqueElements(associations.map(({ control }) => control));
+    if (uniqueControls.length !== 1) return undefined;
+    const control = uniqueControls[0]!;
+    const matchingLabels = associations
+      .filter((association) => sameVisualTarget(association.control, control))
+      .map(({ label }) => label);
+    return {
+      label: uniquelyDominantElement(matchingLabels) ?? matchingLabels[0]!,
+      control,
+    };
   }
 
   public async prepareCheckout(items: readonly RequestedItem[], addressReference: string, addressLabel: string): Promise<AndroidCheckoutReviewV1> {
@@ -962,9 +1194,13 @@ export class BlinkitAndroidDriver {
       source = await this.safeSource('checkout_review');
       const reviewSources = [source];
       for (let attempt = 0; attempt < 5 && !hasSemanticLabel(reviewSources.at(-1)!, addressLabel); attempt += 1) {
+        const before = reviewSources.at(-1)!;
         const canContinue = await this.ui.scrollBackward().catch(() => false);
-        await this.wait(1_000);
-        const nextSource = await this.safeSource('checkout_review');
+        const nextSource = (await this.waitForSourceTransition(
+          'checkout_review_scroll',
+          before,
+          NAVIGATION_TRANSITION_DEADLINE_MS,
+        )).source;
         if (!reviewSources.includes(nextSource)) reviewSources.push(nextSource);
         if (!canContinue) break;
       }
@@ -1042,22 +1278,22 @@ export class BlinkitAndroidDriver {
     }
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (await this.activateSemanticLabel(['My orders', 'Your orders', 'Orders', 'Order History'], source)) {
-        await this.wait(500);
         source = await this.safeSource('order_history');
         if (isOrderHistorySurface(source)) return source;
       }
       if (await this.activateSemanticLabel(['Go to profile', 'Account', 'Profile'], source)) {
-        await this.wait(500);
         source = await this.safeSource('order_history');
         if (await this.activateSemanticLabel(['My orders', 'Your orders', 'Orders', 'Order History'], source)) {
-          await this.wait(500);
           source = await this.safeSource('order_history');
           if (isOrderHistorySurface(source)) return source;
         }
       }
+      const before = source;
       await this.ui.back();
-      await this.wait(500);
-      source = await this.safeSource('order_history');
+      source = (await this.waitForSourceTransition(
+        'order_history_back',
+        before,
+      )).source;
       if (isOrderHistorySurface(source)) return source;
     }
     throw new Error('Blinkit order_history failed');
@@ -1072,10 +1308,9 @@ export class BlinkitAndroidDriver {
   private async returnFromCheckout(initialSource: string, operation: 'address_list' | 'search'): Promise<string> {
     let source = initialSource;
     for (let attempt = 0; attempt < 3 && detectBlinkitAndroidStage(source) === 'checkout'; attempt += 1) {
-      const usedVisibleBack = await this.activateSemanticLabel(['Go back'], source);
+      const usedVisibleBack = await this.activateSemanticLabel(['Go back'], source, false);
       if (!usedVisibleBack) await this.ui.back();
-      await this.wait(500);
-      source = await this.safeSource(operation);
+      source = await this.waitForCheckoutExit(operation, 500);
     }
     if (detectBlinkitAndroidStage(source) === 'checkout') throw new Error(`Blinkit ${operation} failed`);
     return source;
@@ -1083,15 +1318,12 @@ export class BlinkitAndroidDriver {
 
   private async leaveProductDetailForSearch(initialSource: string): Promise<string> {
     if (classifyBlinkitAndroidScreen(initialSource).kind !== 'product_detail') return initialSource;
-    if (await this.activateSemanticLabel(['Search'], initialSource)) {
-      return this.safeSource('search');
+    if (await this.activateSemanticLabel(['Search'], initialSource, false)) {
+      return this.waitForSearchSurface('product_detail_search_navigation', 500);
     }
-    const usedVisibleBack = await this.activateSemanticLabel(['Navigate up', 'Go back'], initialSource);
-    if (!usedVisibleBack) {
-      await this.ui.back();
-      await this.wait(500);
-    }
-    return this.safeSource('search');
+    const usedVisibleBack = await this.activateSemanticLabel(['Navigate up', 'Go back'], initialSource, false);
+    if (!usedVisibleBack) await this.ui.back();
+    return this.waitForSearchSurface('product_detail_back_navigation', 500);
   }
 
   private async searchEntryTargets(): Promise<UiElement[]> {
@@ -1110,13 +1342,157 @@ export class BlinkitAndroidDriver {
     return [];
   }
 
-  private async waitForSearchEntry(): Promise<UiElement[]> {
-    let entries: UiElement[] = [];
-    for (let attempt = 0; attempt < 5 && entries.length === 0; attempt += 1) {
-      entries = await this.searchEntryTargets();
-      if (entries.length === 0 && attempt < 4) await this.wait(500);
+  private async waitForSearchEntry(deadlineMs = 2_500): Promise<UiElement[]> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          const source = await this.safeSource('search');
+          return {
+            source,
+            entries: await this.searchEntryTargets(),
+          };
+        },
+        deadlineMs,
+        evaluate: ({ entries, source }) => entries.length > 0
+          ? { satisfied: true, value: entries }
+          : {
+              satisfied: false,
+              reason: isSearchSurface(source)
+                ? 'search_entry_absent_on_search_surface'
+                : 'search_entry_absent',
+            },
+        initialIntervalMs: 100,
+        maxAttempts: 5,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: 'search_entry',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return [];
+      throw error;
     }
-    return entries;
+  }
+
+  private async waitForSearchField(phase: string, attempts: number): Promise<UiElement[]> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          const source = await this.safeSource('search');
+          return {
+            source,
+            fields: await this.ui.findClassName('android.widget.EditText'),
+          };
+        },
+        deadlineMs: Math.max(1, attempts * 500),
+        evaluate: ({ fields, source }) => fields.length > 0
+          ? { satisfied: true, value: fields }
+          : {
+              satisfied: false,
+              reason: isSearchSurface(source)
+                ? 'search_field_absent_on_search_surface'
+                : 'search_surface_absent',
+            },
+        initialIntervalMs: 100,
+        maxAttempts: attempts,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return [];
+      throw error;
+    }
+  }
+
+  private async waitForSearchSurface(phase: string, deadlineMs: number): Promise<string> {
+    let lastSource = '';
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          lastSource = await this.safeSource('search');
+          return lastSource;
+        },
+        deadlineMs,
+        evaluate: (source) => isSearchSurface(source)
+          ? { satisfied: true, value: source }
+          : { satisfied: false, reason: 'search_surface_absent' as const },
+        initialIntervalMs: 100,
+        maxAttempts: 5,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return lastSource;
+      throw error;
+    }
+  }
+
+  private async waitForCheckoutExit(
+    operation: 'address_list' | 'search',
+    deadlineMs: number,
+  ): Promise<string> {
+    let lastSource = '';
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          lastSource = await this.safeSource(operation);
+          return lastSource;
+        },
+        deadlineMs,
+        evaluate: (source) => detectBlinkitAndroidStage(source) === 'checkout'
+          ? { satisfied: false, reason: 'checkout_still_visible' as const }
+          : { satisfied: true, value: source },
+        initialIntervalMs: 100,
+        maxAttempts: 5,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: `${operation}_checkout_exit`,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return lastSource;
+      throw error;
+    }
+  }
+
+  private async waitForSearchCandidates(
+    query: string,
+    phase: string,
+    attempts: number,
+  ): Promise<AndroidSearchCandidate[]> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: () => this.safeSource('search'),
+        deadlineMs: Math.max(1, attempts * 500),
+        evaluate: (source) => {
+          const candidates = relevantSearchCandidates(
+            query,
+            parseSearchCandidates(source),
+          );
+          return candidates.length > 0
+            ? { satisfied: true, value: candidates }
+            : {
+                satisfied: false,
+                reason: isSearchSurface(source)
+                  ? 'candidates_absent'
+                  : 'search_surface_absent',
+              };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: attempts,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return [];
+      throw error;
+    }
   }
 
   private async cashOnDeliveryTargets(): Promise<UiElement[]> {
@@ -1134,7 +1510,11 @@ export class BlinkitAndroidDriver {
     ].filter(({ clickable }) => clickable));
   }
 
-  private async activateSemanticLabel(labels: readonly string[], source?: string): Promise<boolean> {
+  private async activateSemanticLabel(
+    labels: readonly string[],
+    source?: string,
+    waitAfterClick = true,
+  ): Promise<boolean> {
     const candidates = source ? labels.filter((label) => hasExactSemanticLabel(source, label)) : labels;
     for (const label of candidates) {
       const strategies = [
@@ -1145,8 +1525,17 @@ export class BlinkitAndroidDriver {
       ].map((targets) => uniqueElements(targets.filter(({ clickable }) => clickable)));
       const target = strategies.find((targets) => targets.length === 1)?.[0];
       if (!target) continue;
+      const before = waitAfterClick
+        ? source ?? await this.safeSource('semantic_click')
+        : undefined;
       await this.ui.click(target);
-      await this.wait(500);
+      if (before !== undefined) {
+        await this.waitForSourceTransition(
+          'semantic_click',
+          before,
+          QUICK_TRANSITION_DEADLINE_MS,
+        );
+      }
       return true;
     }
     return false;
@@ -1159,12 +1548,436 @@ export class BlinkitAndroidDriver {
         ...(await this.ui.findExactDescription(label)),
       ]);
       if (matches.length !== 1) continue;
+      const before = await this.safeSource('address_header');
       if (matches[0]!.clickable) await this.ui.click(matches[0]!);
       else await this.ui.tap(matches[0]!);
-      await this.wait(500);
+      await this.waitForSourceTransition(
+        'address_header',
+        before,
+        NAVIGATION_TRANSITION_DEADLINE_MS,
+      );
       return true;
     }
     return false;
+  }
+
+  private async waitForSavedAddressPageChange(
+    previousSignature: string,
+    phase: string,
+  ): Promise<AndroidSavedAddressV1[]> {
+    let latest: AndroidSavedAddressV1[] = [];
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.readVisibleSavedAddresses(previousSignature);
+          return latest;
+        },
+        deadlineMs: QUICK_TRANSITION_DEADLINE_MS,
+        evaluate: (addresses) => (
+          savedAddressPageSignature(addresses) !== previousSignature
+            ? { satisfied: true, value: addresses }
+            : {
+                satisfied: false,
+                reason: 'saved_address_page_unchanged' as const,
+              }
+        ),
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 6),
+        maxIntervalMs: 400,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return latest;
+    }
+  }
+
+  private async waitForCashOnDeliveryTargets(
+    phase: string,
+  ): Promise<UiElement[]> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => ({
+          source: await this.safeSource('payment_select'),
+          targets: await this.cashOnDeliveryTargets(),
+        }),
+        deadlineMs: NAVIGATION_TRANSITION_DEADLINE_MS,
+        evaluate: ({ source, targets }) => (
+          targets.length > 0 || isCashOnDeliveryUnavailable(source)
+            ? { satisfied: true, value: targets }
+            : {
+                satisfied: false,
+                reason: isPaymentSurface(source)
+                  ? 'cod_target_not_visible'
+                  : 'payment_surface_not_ready',
+              }
+        ),
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return [];
+      throw error;
+    }
+  }
+
+  private async waitForCashOnDeliveryVerification(
+    itemSubtotal?: number,
+  ): Promise<void> {
+    try {
+      await waitForSemanticCondition({
+        acquireSnapshot: () => this.safeSource('payment_select'),
+        deadlineMs: Math.max(1, this.pollAttempts * 500),
+        evaluate: (source) => {
+          this.throwIfCodMinimumBlocked(source, itemSubtotal);
+          return hasCashOnDeliveryEvidence(source)
+            ? { satisfied: true, value: undefined }
+            : {
+                satisfied: false,
+                reason: isPaymentSurface(source)
+                  ? 'cod_not_selected'
+                  : 'checkout_not_ready',
+              };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: this.pollAttempts,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: 'payment_verify',
+        wait: this.wait,
+      });
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      throw new Error('Blinkit payment_verify failed');
+    }
+  }
+
+  private async waitForSourceTransition(
+    phase: string,
+    previousSource: string,
+    deadlineMs = NAVIGATION_TRANSITION_DEADLINE_MS,
+  ): Promise<{ source: string; changed: boolean }> {
+    let latest = previousSource;
+    try {
+      const source = (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.safeSource(phase);
+          return latest;
+        },
+        deadlineMs,
+        evaluate: (current) => current !== previousSource
+          ? { satisfied: true, value: current }
+          : { satisfied: false, reason: 'source_unchanged' as const },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+      return { source, changed: true };
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return { source: latest, changed: latest !== previousSource };
+    }
+  }
+
+  private async waitForControlOrSourceChange(
+    phase: string,
+    previousSource: string,
+    controlReady: () => Promise<boolean>,
+  ): Promise<void> {
+    try {
+      await waitForSemanticCondition({
+        acquireSnapshot: async () => ({
+          controlReady: await controlReady(),
+          source: await this.safeSource(phase),
+        }),
+        deadlineMs: MUTATION_TRANSITION_DEADLINE_MS,
+        evaluate: ({ controlReady: ready, source }) => (
+          ready || source !== previousSource
+            ? { satisfied: true, value: undefined }
+            : {
+                satisfied: false,
+                reason: 'mutation_control_unchanged' as const,
+              }
+        ),
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      });
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      throw new Error('Blinkit cart_quantity_verify failed');
+    }
+  }
+
+  private async waitForPostAddControl(
+    description: string,
+    initialAdd: UiElement,
+    initialLabels: readonly UiElement[],
+  ): Promise<
+    | {
+      kind: 'quantity' | 'variant';
+      match: { label: UiElement; control: UiElement };
+    }
+    | undefined
+  > {
+    type PostAddControl = {
+      kind: 'quantity' | 'variant';
+      match: { label: UiElement; control: UiElement };
+    };
+    try {
+      return (await waitForSemanticCondition<
+        {
+          quantity: { label: UiElement; control: UiElement } | undefined;
+          variant: { label: UiElement; control: UiElement } | undefined;
+        },
+        PostAddControl,
+        'cart_quantity_post_add',
+        'post_add_control_not_ready'
+      >({
+        acquireSnapshot: async () => ({
+          quantity: await this.uniqueProductControl(
+            description,
+            'Decrease quantity',
+          ),
+          variant: await this.uniqueProductControl(description, 'ADD', {
+            excludedControls: [initialAdd],
+            excludedLabels: initialLabels,
+          }),
+        }),
+        deadlineMs: MUTATION_TRANSITION_DEADLINE_MS,
+        evaluate: ({ quantity, variant }) => quantity
+          ? {
+              satisfied: true,
+              value: { kind: 'quantity', match: quantity },
+            }
+          : variant
+            ? {
+                satisfied: true,
+                value: { kind: 'variant', match: variant },
+              }
+            : {
+                satisfied: false,
+                reason: 'post_add_control_not_ready' as const,
+              },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: 'cart_quantity_post_add',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return undefined;
+      throw error;
+    }
+  }
+
+  private async waitForProductControl(
+    description: string,
+    control: 'ADD' | 'Decrease quantity' | 'Increase quantity',
+    phase: string,
+  ): Promise<{ label: UiElement; control: UiElement } | undefined> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: () => this.uniqueProductControl(description, control),
+        deadlineMs: MUTATION_TRANSITION_DEADLINE_MS,
+        evaluate: (match) => match
+          ? { satisfied: true, value: match }
+          : {
+              satisfied: false,
+              reason: 'product_control_not_ready' as const,
+            },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return undefined;
+      throw error;
+    }
+  }
+
+  private async waitForShareSurface(
+    previousSource: string,
+    phase: string,
+  ): Promise<string> {
+    let latest = previousSource;
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.safeSource('cart_share');
+          return latest;
+        },
+        deadlineMs: NAVIGATION_TRANSITION_DEADLINE_MS,
+        evaluate: (source) => (
+          source !== previousSource
+          && (
+            Boolean(extractBlinkitShareUrl(source))
+            || hasSemanticLabel(source, 'Share your cart')
+            || hasSemanticLabel(source, 'Share with')
+            || hasSemanticLabel(source, 'Copy')
+          )
+            ? { satisfied: true, value: source }
+            : {
+                satisfied: false,
+                reason: 'share_surface_not_ready' as const,
+              }
+        ),
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return latest;
+    }
+  }
+
+  private async waitForClipboardShareUrl(): Promise<string | undefined> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: () => this.ui.readClipboardText(),
+        deadlineMs: QUICK_TRANSITION_DEADLINE_MS,
+        evaluate: (clipboard) => {
+          const url = extractBlinkitShareUrl(clipboard);
+          return url
+            ? { satisfied: true, value: url }
+            : {
+                satisfied: false,
+                reason: 'blinkit_share_url_not_available' as const,
+              };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 6),
+        maxIntervalMs: 400,
+        now: this.now,
+        phase: 'cart_share_clipboard',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return undefined;
+      throw error;
+    }
+  }
+
+  private async waitForCartSurface(phase: string): Promise<string> {
+    let latest = '';
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.safeSource(phase);
+          return latest;
+        },
+        deadlineMs: NAVIGATION_TRANSITION_DEADLINE_MS,
+        evaluate: (source) => parseLiveAndroidCart(source)
+          ? { satisfied: true, value: source }
+          : {
+              satisfied: false,
+              reason: 'cart_surface_not_ready' as const,
+            },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return latest;
+    }
+  }
+
+  private async waitForImportSurface(previousSource: string): Promise<string> {
+    let latest = previousSource;
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.safeSource('cart_import_source');
+          return latest;
+        },
+        deadlineMs: NAVIGATION_TRANSITION_DEADLINE_MS,
+        evaluate: (source) => {
+          const stage = detectBlinkitAndroidStage(source);
+          const importPrompt = [
+            'Add all items to cart',
+            'Add items to cart',
+            'Add all items',
+            'Import cart',
+          ].some((label) => hasExactSemanticLabel(source, label));
+          return source !== previousSource
+            && (
+              importPrompt
+              || Boolean(parseLiveAndroidCart(source))
+              || stage !== 'unknown'
+            )
+            ? { satisfied: true, value: source }
+            : {
+                satisfied: false,
+                reason: 'cart_import_surface_not_ready' as const,
+              };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: 'cart_import_open',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return latest;
+    }
+  }
+
+  private async waitForSemanticLabel(
+    phase: string,
+    label: string,
+    deadlineMs = NAVIGATION_TRANSITION_DEADLINE_MS,
+  ): Promise<string> {
+    let latest = '';
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          latest = await this.safeSource(phase);
+          return latest;
+        },
+        deadlineMs,
+        evaluate: (source) => hasSemanticLabel(source, label)
+          ? { satisfied: true, value: source }
+          : {
+              satisfied: false,
+              reason: 'semantic_label_not_visible' as const,
+            },
+        initialIntervalMs: 100,
+        maxAttempts: Math.min(this.pollAttempts, 8),
+        maxIntervalMs: 500,
+        now: this.now,
+        phase,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
+      return latest;
+    }
   }
 
   private async safeSource(stage: string): Promise<string> {
@@ -1172,14 +1985,31 @@ export class BlinkitAndroidDriver {
   }
 
   private async waitForRecognizedScreen(failureStage: string): Promise<{ stage: BlinkitAndroidStage; source: string }> {
-    let source = '';
-    for (let attempt = 0; attempt < this.pollAttempts; attempt += 1) {
-      source = await this.safeSource(failureStage);
-      const stage = detectBlinkitAndroidStage(source);
-      if (stage !== 'unknown') return { stage, source };
-      if (attempt + 1 < this.pollAttempts) await this.wait(500);
+    let lastSource = '';
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: async () => {
+          lastSource = await this.safeSource(failureStage);
+          return lastSource;
+        },
+        deadlineMs: Math.max(1, this.pollAttempts * 500),
+        evaluate: (source) => {
+          const stage = detectBlinkitAndroidStage(source);
+          return stage === 'unknown'
+            ? { satisfied: false, reason: 'screen_unrecognized' as const }
+            : { satisfied: true, value: { stage, source } };
+        },
+        initialIntervalMs: 100,
+        maxAttempts: this.pollAttempts,
+        maxIntervalMs: 500,
+        now: this.now,
+        phase: failureStage,
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (!(error instanceof SemanticConditionTimeoutError)) throw error;
     }
-    return { stage: 'unknown', source };
+    return { stage: 'unknown', source: lastSource };
   }
 
   private async waitForStage(expected: readonly BlinkitAndroidStage[], attempts = this.pollAttempts): Promise<BlinkitAndroidStage> {
@@ -1190,19 +2020,33 @@ export class BlinkitAndroidDriver {
     expected: readonly BlinkitAndroidStage[],
     attempts = this.pollAttempts,
   ): Promise<{ stage: BlinkitAndroidStage; source: string }> {
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const source = await this.safeSource('stage_wait');
-      const stage = detectBlinkitAndroidStage(source);
-      if (expected.includes(stage)) return { stage, source };
-      if (attempt + 1 < attempts) await this.wait(500);
-    }
-    throw new Error('Blinkit stage_wait failed');
+    return (await waitForSemanticCondition({
+      acquireSnapshot: () => this.safeSource('stage_wait'),
+      deadlineMs: Math.max(1, attempts * 500),
+      evaluate: (source) => {
+        const stage = detectBlinkitAndroidStage(source);
+        return expected.includes(stage)
+          ? { satisfied: true, value: { stage, source } }
+          : {
+              satisfied: false,
+              reason: `expected_${expected.join('_')}_observed_${stage}`,
+            };
+      },
+      initialIntervalMs: 100,
+      maxAttempts: attempts,
+      maxIntervalMs: 500,
+      now: this.now,
+      phase: 'stage_wait',
+      wait: this.wait,
+    })).value;
   }
 
   private async readBillDetails(): Promise<string> {
     const direct = await this.ui.scrollExactTextIntoView('Bill details').then(async () => {
-      await this.wait(300);
-      return this.safeSource('checkout_bill');
+      return this.waitForSemanticLabel(
+        'checkout_bill_exact_scroll',
+        'Bill details',
+      );
     }).catch(() => undefined);
     if (direct) return direct;
 
@@ -1211,8 +2055,11 @@ export class BlinkitAndroidDriver {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       if (this.ui.scrollElementForward) await this.ui.scrollElementForward(mainScrollers[0]!);
       else await this.ui.scrollForward();
-      await this.wait(300);
-      const source = await this.safeSource('checkout_bill');
+      const source = await this.waitForSemanticLabel(
+        'checkout_bill_scroll',
+        'Bill details',
+        QUICK_TRANSITION_DEADLINE_MS,
+      );
       if (hasSemanticLabel(source, 'Bill details')) return source;
     }
     throw new Error('Blinkit checkout_bill failed');
@@ -1377,6 +2224,11 @@ function verticalCenter(element: UiElement): number {
   return element.rect.y + element.rect.height / 2;
 }
 
+function productTitleFromAvailabilityDescription(description: string): string | undefined {
+  return /^(.+?)\s+is\s+(?:available|unavailable|not available)\s+for\s+₹\s*[\d,.]+$/i
+    .exec(description)?.[1]?.trim();
+}
+
 function parseSearchCandidates(source: string): AndroidSearchCandidate[] {
   const tagged = parseTags(source, 'offer').map((attributes) => {
     const title = required(attributes, 'title');
@@ -1442,6 +2294,20 @@ function dedupeSearchCandidates(candidates: readonly AndroidSearchCandidate[]): 
   return [...unique.values()];
 }
 
+function searchCandidateSurfaceFingerprint(
+  candidates: readonly AndroidSearchCandidate[],
+): string {
+  return JSON.stringify(candidates.map((candidate) => [
+    candidate.offerId,
+    candidate.providerLocator,
+    normalizeSearchText(candidate.title),
+    candidate.packSize ?? null,
+    candidate.price.currency,
+    minor(candidate.price.amount),
+    candidate.available,
+  ]));
+}
+
 function safeProductImageUrl(value: string | undefined): string | undefined {
   if (!value || value.length > 2_048) return undefined;
   try {
@@ -1498,6 +2364,13 @@ function parseElements(source: string): AttributeMap[] {
   return [...matches].map((match) => parseAttributes(match[1] ?? ''));
 }
 
+function hasFocusedEditable(source: string): boolean {
+  return parseElements(source).some((attributes) => (
+    attributes['class'] === 'android.widget.EditText'
+    && attributes['focused'] === 'true'
+  ));
+}
+
 function semanticLabelsMatching(source: string, pattern: RegExp): string[] {
   const labels = parseElements(source).flatMap((attributes) => [
     attributes['text'],
@@ -1528,6 +2401,20 @@ function chooseOffer<T extends AndroidSearchOffer>(query: string, offers: readon
   if (exact.length > 1) return undefined;
   const containing = available.filter((offer) => offer.title.toLowerCase().includes(normalized));
   return containing.length === 1 ? containing[0] : undefined;
+}
+
+function matchingVisibleOffer(
+  candidates: readonly AndroidSearchCandidate[],
+  offer: AndroidSearchOffer,
+): AndroidSearchCandidate | undefined {
+  const matches = candidates.filter((candidate) =>
+    candidate.available
+    && candidate.offerId === offer.offerId
+    && normalizeSearchText(candidate.title) === normalizeSearchText(offer.title)
+    && (candidate.packSize ?? '') === (offer.packSize ?? '')
+    && candidate.price.currency === offer.price.currency
+    && minor(candidate.price.amount) === minor(offer.price.amount));
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 function createOfferId(title: string, packSize: string | undefined, amount: number): string {

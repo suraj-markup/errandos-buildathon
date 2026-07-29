@@ -11,11 +11,15 @@ const button = (text: string): UiElement => ({ id: text, text, clickable: true, 
 
 class Ui implements AndroidUiPort {
   public sources: string[] = [];
+  public sourceReads = 0;
   public clicks: string[] = [];
   public backs = 0;
   public textTargets = true;
   public descriptionAncestors = new Map<string, UiElement[]>();
-  public async source(): Promise<string> { return this.sources.shift() ?? '<hierarchy/>'; }
+  public async source(): Promise<string> {
+    this.sourceReads += 1;
+    return this.sources.shift() ?? '<hierarchy/>';
+  }
   public async findExactText(text: string): Promise<UiElement[]> { return this.textTargets ? [button(text)] : []; }
   public async findExactDescription(): Promise<UiElement[]> { return []; }
   public async findClickableAncestorOfExactText(): Promise<UiElement[]> { return []; }
@@ -46,6 +50,30 @@ describe('bounded screen recovery', () => {
 
     await expect(recovery.recover('authenticate', ['storefront'])).resolves.toBe('storefront');
     expect(ui.clicks).toEqual(['Not now']);
+  });
+
+  it('completes search overlay recovery on the immediate semantic snapshot without a fixed wait', async () => {
+    const ui = new Ui();
+    const waits: number[] = [];
+    ui.sources = [
+      '<hierarchy><node text="Enjoying Blinkit?" clickable="false"/><node text="Not now" clickable="true"/></hierarchy>',
+      '<hierarchy><node text="Search for atta, dal, coke and more" clickable="true"/></hierarchy>',
+    ];
+    const recovery = new BoundedScreenRecovery(
+      ui,
+      new KnownScreenRecoveryPlanner(),
+      {
+        wait: async (milliseconds): Promise<void> => {
+          waits.push(milliseconds);
+        },
+      },
+    );
+
+    await expect(recovery.recover('search', ['storefront']))
+      .resolves.toBe('storefront');
+    expect(ui.clicks).toEqual(['Not now']);
+    expect(ui.sourceReads).toBe(2);
+    expect(waits).toEqual([]);
   });
 
   it('uses the saved-location path when the location permission modal appears', async () => {

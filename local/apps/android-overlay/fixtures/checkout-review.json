@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "mode": "waiting_for_user",
+  "primarySurface": "provider_screen",
+  "currentScreen": {
+    "kind": "checkout",
+    "searchAction": "recoverable",
+    "relevance": "checkout_summary",
+    "verified": true
+  },
+  "attentionCue": {
+    "instruction": "check_current_screen",
+    "subject": "checkout"
+  },
+  "card": {
+    "type": "compact_status",
+    "tone": "confirmation"
+  },
+  "spoken": {
+    "text": "Your Cash on Delivery total is ₹356 for Home. Nothing has been ordered. Check the checkout summary on the current screen.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

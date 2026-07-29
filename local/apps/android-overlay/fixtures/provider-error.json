@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "mode": "error",
+  "primarySurface": "overlay_card",
+  "card": {
+    "type": "provider_constraint",
+    "reason": "Blinkit could not load the search results. Try again."
+  },
+  "spoken": {
+    "text": "Blinkit could not load the search results. Try again.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

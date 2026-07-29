@@ -3,6 +3,9 @@ interface RecorderFormat {
   mimeType: string;
 }
 
+export const MIN_RECORDING_MS = 1_200;
+export const MIN_RECORDING_BYTES = 1_024;
+
 const RECORDER_FORMATS: readonly RecorderFormat[] = [
   { mimeType: 'audio/webm;codecs=opus', extension: 'webm' },
   { mimeType: 'audio/webm', extension: 'webm' },
@@ -26,3 +29,8 @@ export const audioFilename = (mimeType: string): string => {
   if (normalized === 'audio/wav' || normalized === 'audio/x-wav') return 'voice.wav';
   return 'voice.webm';
 };
+
+export const recordingReadyForUpload = (
+  durationMs: number,
+  sizeBytes: number,
+): boolean => durationMs >= MIN_RECORDING_MS && sizeBytes >= MIN_RECORDING_BYTES;

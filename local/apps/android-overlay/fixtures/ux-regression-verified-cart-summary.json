@@ -1,0 +1,129 @@
+{
+  "version": 2,
+  "eventId": "event_ux-verified-cart-summary",
+  "taskId": "task_ux-four-item-12345678",
+  "taskRevision": 11,
+  "operationId": "operation_ux-four-item-12345678",
+  "sequence": 15,
+  "kind": "completed",
+  "title": "Your cart is ready",
+  "detail": "4 verified items · Subtotal ₹880 · NOT ORDERED",
+  "itemPosition": {"current": 4, "total": 4},
+  "occurredAt": 1785201001500,
+  "announcement": {
+    "channel": "speech_and_visual",
+    "text": "All four items are in your cart. The subtotal is ₹880."
+  },
+  "finalCartSummary": {
+    "status": "ready",
+    "lines": [
+      {
+        "productId": "product-potato-1kg",
+        "title": "Potato",
+        "quantity": 1,
+        "price": "₹27"
+      },
+      {
+        "productId": "product-amul-paneer-200",
+        "title": "Amul Fresh Malai Paneer, 200 g",
+        "quantity": 1,
+        "price": "₹105"
+      },
+      {
+        "productId": "product-abis-chicken-500",
+        "title": "Abis Pro Chicken Curry Cut, 500 g",
+        "quantity": 1,
+        "price": "₹129"
+      },
+      {
+        "productId": "product-anand-rice-10kg",
+        "title": "Anand Boiled Rice, 10 kg",
+        "quantity": 1,
+        "price": "₹619"
+      }
+    ],
+    "subtotal": "₹880",
+    "inspectedAt": 1785201001500
+  },
+  "interaction": {
+    "version": 2,
+    "interactionId": "interaction_ux-complete-12345678",
+    "taskId": "task_ux-four-item-12345678",
+    "taskRevision": 11,
+    "expiresAt": 4102444800000,
+    "choices": [
+      {
+        "choiceId": "review_cart",
+        "label": "Review cart",
+        "enabled": true
+      },
+      {
+        "choiceId": "keep_shopping",
+        "label": "Keep shopping",
+        "enabled": true
+      },
+      {
+        "choiceId": "review_checkout",
+        "label": "Review checkout",
+        "enabled": true
+      },
+      {
+        "choiceId": "stop",
+        "label": "Stop here",
+        "enabled": true
+      }
+    ]
+  },
+  "safePresentation": {
+    "version": 1,
+    "mode": "success",
+    "primarySurface": "overlay_card",
+    "card": {
+      "type": "cart_summary",
+      "ordered": false,
+      "cart": {
+        "verified": true,
+        "addressLabel": "Home",
+        "lines": [
+          {
+            "productId": "product-potato-1kg",
+            "name": "Potato",
+            "quantity": 1,
+            "unitPrice": {"currency": "INR", "amount": 27},
+            "lineTotal": {"currency": "INR", "amount": 27}
+          },
+          {
+            "productId": "product-amul-paneer-200",
+            "name": "Amul Fresh Malai Paneer, 200 g",
+            "quantity": 1,
+            "unitPrice": {"currency": "INR", "amount": 105},
+            "lineTotal": {"currency": "INR", "amount": 105}
+          },
+          {
+            "productId": "product-abis-chicken-500",
+            "name": "Abis Pro Chicken Curry Cut, 500 g",
+            "quantity": 1,
+            "unitPrice": {"currency": "INR", "amount": 129},
+            "lineTotal": {"currency": "INR", "amount": 129}
+          },
+          {
+            "productId": "product-anand-rice-10kg",
+            "name": "Anand Boiled Rice, 10 kg",
+            "quantity": 1,
+            "unitPrice": {"currency": "INR", "amount": 619},
+            "lineTotal": {"currency": "INR", "amount": 619}
+          }
+        ],
+        "subtotal": {"currency": "INR", "amount": 880}
+      }
+    },
+    "spoken": {
+      "text": "All four items are in your cart. The subtotal is ₹880.",
+      "languageCode": "en-IN"
+    },
+    "behavior": {
+      "autoCollapse": false,
+      "keepVisibleWhileSpeaking": true
+    }
+  }
+}

@@ -54,8 +54,12 @@ Blinkit order placed successfully.
 
 Total — ₹50
 Payment — Cash on Delivery
+ETA — 12 minutes
+Please keep ₹50 ready for Cash on Delivery.
 Provider reference — BLK123456
 ```
+
+Use the same facts for the single final voice note: “Your Blinkit order is confirmed. It should arrive in 12 minutes. Please keep ₹50 ready for Cash on Delivery.” If the durable summary omits ETA, say that the ETA is not currently available; never estimate it.
 
 ## Ambiguous
 

@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "mode": "waiting_for_user",
+  "primarySurface": "overlay_card",
+  "task": {
+    "version": 1,
+    "taskId": "task_ux-four-item-12345678",
+    "itemId": "task_item_paneer-12345678",
+    "operationId": "operation_ux-four-item-12345678",
+    "title": "Adding 4 items",
+    "step": "Waiting for your paneer choice",
+    "stage": "waiting_for_choice",
+    "sequence": 5,
+    "position": {"current": 2, "total": 4},
+    "cancellation": {
+      "available": true,
+      "policy": "cancel_now"
+    },
+    "terminal": false
+  },
+  "card": {
+    "type": "product_choices",
+    "selection": {
+      "version": 2,
+      "clientId": "pixel-overlay",
+      "taskId": "task_ux-four-item-12345678",
+      "taskRevision": 4,
+      "interactionId": "interaction_ux-paneer-12345678",
+      "selectionId": "selection_ux-paneer-12345678",
+      "expiresAt": "2099-07-28T10:00:00.000Z"
+    },
+    "options": [
+      {
+        "offerId": "offer-paneer-amul-200",
+        "imageUrl": "https://cdn.blinkit.com/products/amul-paneer-200.png",
+        "title": "Amul Fresh Malai Paneer",
+        "spokenLabel": "Amul Fresh Malai Paneer",
+        "packSize": "200 g",
+        "price": {"currency": "INR", "amount": 105},
+        "unitPrice": {"currency": "INR", "amount": 52.5, "unit": "100 g"},
+        "availabilityConstraint": "In stock",
+        "recommendation": {
+          "code": "suggested_exact_pack",
+          "label": "Suggested"
+        }
+      },
+      {
+        "offerId": "offer-paneer-heritage-200",
+        "imageUrl": "https://cdn.blinkit.com/products/heritage-paneer-200.png",
+        "title": "Heritage Fresh Paneer",
+        "spokenLabel": "Heritage Fresh Paneer",
+        "packSize": "200 g",
+        "price": {"currency": "INR", "amount": 101},
+        "unitPrice": {"currency": "INR", "amount": 50.5, "unit": "100 g"},
+        "availabilityConstraint": "In stock",
+        "recommendation": {
+          "code": "lowest_price_exact_pack",
+          "label": "Lowest price"
+        }
+      },
+      {
+        "offerId": "offer-paneer-milky-mist-200",
+        "imageUrl": "https://cdn.blinkit.com/products/milky-mist-paneer-200.png",
+        "title": "Milky Mist Paneer",
+        "spokenLabel": "Milky Mist Paneer",
+        "packSize": "200 g",
+        "price": {"currency": "INR", "amount": 105},
+        "unitPrice": {"currency": "INR", "amount": 52.5, "unit": "100 g"},
+        "availabilityConstraint": "Only 4 left"
+      }
+    ]
+  },
+  "acceptedSelectionProjection": {
+    "offerId": "offer-paneer-amul-200",
+    "title": "Amul Fresh Malai Paneer",
+    "packSize": "200 g",
+    "price": {"currency": "INR", "amount": 105},
+    "visualState": "selected",
+    "nextPhase": "adding",
+    "equivalentInputSources": ["tap", "voice"]
+  },
+  "spoken": {
+    "text": "Choose a paneer option.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

@@ -1,0 +1,29 @@
+mcp_servers:
+  errandos:
+    command: pnpm
+    args:
+      - --dir
+      - /absolute/path/to/errandos
+      - --filter
+      - '@errandos/control-plane'
+      - exec
+      - tsx
+      - src/mcp-entry.ts
+    env:
+      ERRANDOS_DEPLOYMENT_PROFILE: personal
+      ERRANDOS_PERSISTENCE_MODE: filesystem
+      ERRANDOS_DATA_ROOT: /var/lib/errandos-public-cart
+      ERRANDOS_PRINCIPAL_ID: public-cart-handoff
+      ERRANDOS_PROFILE_REF_SECRET: replace-with-at-least-32-random-bytes
+      ERRANDOS_APPROVAL_HMAC_SECRET: replace-with-a-different-32-byte-secret
+      ERRANDOS_MCP_SURFACE: public-cart
+      ERRANDOS_TRUSTED_AUTONOMOUS_COD: 'false'
+      ERRANDOS_LIVE_BROWSER_ACTIONS: 'true'
+      ERRANDOS_LIVE_COMMIT: 'false'
+      ERRANDOS_RAPIDO_LIVE_COMMIT: 'false'
+      ERRANDOS_BLINKIT_EXECUTION: android
+      ERRANDOS_ANDROID_WORKER_SSH_HOST: public-cart-worker.example.ts.net
+      ERRANDOS_ANDROID_WORKER_SSH_USER: errandos-worker-agent
+      ERRANDOS_ANDROID_WORKER_IDENTITY_FILE: /run/secrets/public-cart-worker-key
+      ERRANDOS_ANDROID_WORKER_KNOWN_HOSTS_FILE: /run/secrets/public-cart-worker-known-hosts
+      ERRANDOS_ANDROID_WORKER_COMMAND: /opt/errandos/bin/android-worker-job

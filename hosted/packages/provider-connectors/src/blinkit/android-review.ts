@@ -154,10 +154,19 @@ export function parseAndroidOrderCandidates(
   if (tagged.length > 0) return tagged;
 
   const references = extractProviderReferences(source);
-  if (detectBlinkitAndroidStage(source) === 'confirmed' && observedAt && references.length === 1) {
+  if (detectBlinkitAndroidStage(source) === 'confirmed' && observedAt) {
     const time = observedAt.getTime();
     if (time >= Date.parse(expected.preparedAt) && time <= Date.parse(expected.expiresAt)) {
-      return [{ providerReference: references[0]!, orderedAt: observedAt.toISOString(), checkout: expected.checkout }];
+      if (references.length === 1) {
+        return [{ providerReference: references[0]!, orderedAt: observedAt.toISOString(), checkout: expected.checkout }];
+      }
+      if (references.length === 0 && hasDeliveredCurrentOrderEvidence(source, expected.checkout.addressLabel)) {
+        return [{
+          providerReference: opaqueProposalOrderReference(expected),
+          orderedAt: observedAt.toISOString(),
+          checkout: expected.checkout,
+        }];
+      }
     }
   }
 
@@ -169,6 +178,23 @@ export function parseAndroidOrderCandidates(
   const orderedAt = hasExactTerms ? extractOrderTimestamp(source) : undefined;
   if (!orderedAt) return [];
   return references.map((providerReference) => ({ providerReference, orderedAt, checkout: expected.checkout }));
+}
+
+function hasDeliveredCurrentOrderEvidence(source: string, addressLabel: string): boolean {
+  const labels = extractLabels(source);
+  const normalizedAddress = addressLabel.trim().toLowerCase();
+  return /order\s+(?:arrived|delivered)/i.test(source)
+    && /details\s+of\s+your\s+current\s+order/i.test(source)
+    && /how\s+was\s+your\s+order\s+experience|rate\s+now/i.test(source)
+    && labels.some((label) => label.trim().toLowerCase() === `delivery at ${normalizedAddress}`);
+}
+
+function opaqueProposalOrderReference(expected: AndroidExpectedCheckoutV1): string {
+  const digest = createHash('sha256')
+    .update(`${expected.proposalHash}\n${expected.checkout.providerFingerprint}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `order_${digest}`;
 }
 
 function extractLabels(source: string): string[] {

@@ -4,9 +4,23 @@ export function validateDeploymentEnvironment(environment: NodeJS.ProcessEnv): v
   const isProduction = environment['NODE_ENV'] === 'production';
   const usesFilesystem = environment['ERRANDOS_PERSISTENCE_MODE'] === 'filesystem';
   const isPersonal = environment['ERRANDOS_DEPLOYMENT_PROFILE'] === 'personal';
+  const mcpSurface = environment['ERRANDOS_MCP_SURFACE'];
 
   if (isProduction && usesFilesystem && !isPersonal) {
     throw new Error('production filesystem persistence requires ERRANDOS_DEPLOYMENT_PROFILE=personal');
+  }
+  if (mcpSurface !== undefined && mcpSurface !== 'public-cart') {
+    throw new Error('ERRANDOS_MCP_SURFACE must be public-cart when configured');
+  }
+  if (
+    mcpSurface === 'public-cart'
+    && (
+      environment['ERRANDOS_LIVE_COMMIT'] === 'true'
+      || environment['ERRANDOS_RAPIDO_LIVE_COMMIT'] === 'true'
+      || environment['ERRANDOS_TRUSTED_AUTONOMOUS_COD'] === 'true'
+    )
+  ) {
+    throw new Error('public-cart MCP surface forbids every live commit and autonomous COD gate');
   }
 
   const execution = environment['ERRANDOS_BLINKIT_EXECUTION'];

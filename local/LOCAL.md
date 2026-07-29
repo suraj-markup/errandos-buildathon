@@ -29,7 +29,7 @@ No runtime dependency points from `local/` back to `hosted/`.
 hold overlay
   → Sarvam speech-to-text
   → OpenAI tool planning
-  → hosted Blinkit driver copied into local
+  → local semantic Blinkit driver
   → search visible offers
   → ask a spoken follow-up when ambiguous
   → continue with the selected opaque offerId

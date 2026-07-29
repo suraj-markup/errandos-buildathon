@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "mode": "waiting_for_user",
+  "primarySurface": "provider_screen",
+  "currentScreen": {
+    "kind": "search_results",
+    "searchAction": "available",
+    "relevance": "product_options",
+    "verified": false
+  },
+  "attentionCue": {
+    "instruction": "check_current_screen",
+    "subject": "options"
+  },
+  "card": {
+    "type": "product_choices",
+    "options": [
+      {
+        "offerId": "unsafe-preview",
+        "title": "This must not render",
+        "spokenLabel": "Unsafe preview"
+      }
+    ]
+  },
+  "spoken": {
+    "text": "This unverified payload must not direct attention.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

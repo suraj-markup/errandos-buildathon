@@ -52,6 +52,25 @@ describe('Appium HTTP client', () => {
     await client.close();
   });
 
+  it('can open a strictly read-only session without foregrounding an app', async () => {
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      const url = String(input);
+      requests.push({ url, init });
+      return url.endsWith('/session')
+        ? jsonResponse({ sessionId: 'session-1' })
+        : jsonResponse(true);
+    };
+
+    const client = await AppiumHttpClient.open({
+      activateApp: false,
+      fetch: fetcher,
+    });
+
+    expect(requests.some(({ url }) => url.endsWith('/execute/sync'))).toBe(false);
+    await client.close();
+  });
+
   it('activates a semantic source rectangle with one Appium gesture', async () => {
     const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
     const fetcher: typeof fetch = async (input, init) => {
@@ -154,6 +173,54 @@ describe('Appium HTTP client', () => {
     expect(requests.filter(({ url }) => url.endsWith('/elements')).some(({ init }) => String(init?.body).includes('ancestor'))).toBe(true);
     expect(requests.filter(({ url }) => url.endsWith('/elements')).some(({ init }) => String(init?.body).includes('scrollable'))).toBe(true);
     expect(requests.some(({ url, init }) => url.endsWith('/execute/sync') && String(init?.body).includes('mobile: clickGesture'))).toBe(true);
+    await client.close();
+  });
+
+  it('reads an in-memory screenshot with package, orientation, and viewport metadata', async () => {
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith('/session')) return jsonResponse({ sessionId: 'session-1' });
+      if (url.endsWith('/screenshot')) return jsonResponse(png.toString('base64'));
+      if (url.endsWith('/appium/device/current_package')) {
+        return jsonResponse('com.grofers.customerapp');
+      }
+      if (url.endsWith('/orientation')) return jsonResponse('PORTRAIT');
+      if (url.endsWith('/window/rect')) {
+        return jsonResponse({ x: 0, y: 0, width: 1080, height: 2400 });
+      }
+      return jsonResponse(true);
+    };
+    const client = await AppiumHttpClient.open({ fetch: fetcher });
+
+    await expect(client.screenshot()).resolves.toEqual(new Uint8Array(png));
+    await expect(client.currentPackage()).resolves.toBe('com.grofers.customerapp');
+    await expect(client.orientation()).resolves.toBe('PORTRAIT');
+    await expect(client.windowRect()).resolves.toEqual({
+      x: 0,
+      y: 0,
+      width: 1080,
+      height: 2400,
+    });
+    await client.close();
+  });
+
+  it('fails closed when Appium returns malformed screenshot or orientation data', async () => {
+    let malformed: 'orientation' | 'screenshot' = 'screenshot';
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith('/session')) return jsonResponse({ sessionId: 'session-1' });
+      if (url.endsWith('/screenshot')) {
+        return jsonResponse(malformed === 'screenshot' ? 'not base64!' : 'iVBORw0KGgo=');
+      }
+      if (url.endsWith('/orientation')) return jsonResponse('UPSIDE_DOWN');
+      return jsonResponse(true);
+    };
+    const client = await AppiumHttpClient.open({ fetch: fetcher });
+
+    await expect(client.screenshot()).rejects.toThrow('Appium screenshot_read failed');
+    malformed = 'orientation';
+    await expect(client.orientation()).rejects.toThrow('Appium orientation_read failed');
     await client.close();
   });
 

@@ -9,7 +9,7 @@ import type {
   ProviderSubmitOtpOutput,
 } from '@errandos/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createMcpServer,runMcpServer } from '../src/mcp.js';
+import { createMcpServer,PUBLIC_CART_MCP_TOOL_NAMES,runMcpServer } from '../src/mcp.js';
 import { AndroidWorkerClientError, AndroidWorkerOperationError } from '@errandos/provider-connectors';
 import { ProposalNotFoundError } from '@errandos/application';
 
@@ -126,6 +126,44 @@ describe('MCP protocol surface', () => {
     } finally {
       await canonicalClient.close();
       await canonicalServer.close();
+    }
+  });
+
+  it('advertises only reversible cart-handoff tools on the public surface', async () => {
+    const publicServer = createMcpServer(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { canonicalOnly: true, allowedToolNames: PUBLIC_CART_MCP_TOOL_NAMES },
+    );
+    const publicClient = new Client({ name: 'public-cart-surface-test', version: '0.1.0' });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await Promise.all([publicServer.connect(st), publicClient.connect(ct)]);
+    try {
+      const { tools } = await publicClient.listTools();
+      expect(tools.map(({ name }) => name)).toEqual([
+        'blinkit_search_products',
+        'blinkit_readiness',
+        'blinkit_clear_cart',
+        'blinkit_add_cart_item',
+        'blinkit_current_screen',
+        'blinkit_share_cart',
+      ]);
+      expect(tools.map(({ name }) => name)).not.toEqual(expect.arrayContaining([
+        'blinkit_begin_login',
+        'blinkit_list_saved_addresses',
+        'blinkit_recent_orders',
+        'blinkit_prepare_existing_cart_cod_order',
+        'blinkit_place_cod_order',
+        'rapido_request_ride',
+      ]));
+    } finally {
+      await publicClient.close();
+      await publicServer.close();
     }
   });
 

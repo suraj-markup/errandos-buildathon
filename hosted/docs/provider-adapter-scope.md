@@ -2,7 +2,7 @@
 
 **Updated:** 2026-07-26
 
-JaldiAI has two active provider-specific capabilities:
+ErrandOS has two active provider-specific capabilities:
 
 - Blinkit COD through the official Android app on the dedicated GCP emulator.
 - Rapido authentication and transaction-safe ride tooling through the official Android app on the isolated Appium worker.

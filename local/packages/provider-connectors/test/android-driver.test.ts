@@ -1,6 +1,12 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { AndroidUiPort, UiElement } from '../src/android/appium-client.js';
-import { BlinkitAndroidDriver } from '../src/blinkit/android-driver.js';
+import { SemanticConditionTimeoutError } from '../src/android/adaptive-semantic-wait.js';
+import { AndroidCartMutationVerificationError } from '../src/android/cart-mutation-verification.js';
+import {
+  BlinkitAndroidDriver,
+  BlinkitOfferSelectionStaleError,
+} from '../src/blinkit/android-driver.js';
 import { buildLiveAndroidReview, parseLiveAndroidCart } from '../src/blinkit/android-review.js';
 import { parseSavedAddresses } from '../src/blinkit/android-safe-reads.js';
 
@@ -824,7 +830,9 @@ describe('Blinkit Android driver', () => {
     await new BlinkitAndroidDriver(ui, { wait: async (milliseconds): Promise<void> => { waits.push(milliseconds); } }).selectCashOnDelivery();
 
     expect(ui.operations).toEqual(['scroll:Pay On Delivery', 'scroll:forward', 'scroll:forward', 'tap:Cash on Delivery']);
-    expect(waits).toEqual([1_500, 1_500, 1_500]);
+    expect(waits).not.toContain(1_500);
+    expect(waits.every((milliseconds) => milliseconds >= 100 && milliseconds <= 500)).toBe(true);
+    expect(waits.slice(0, 4)).toEqual([100, 150, 225, 337.5]);
   });
 
   it('reports a sanitized target stage when COD never appears', async () => {
@@ -894,6 +902,7 @@ describe('Blinkit Android driver', () => {
 
   it('opens the one clickable View cart control', async () => {
     const ui = new FakeUi();
+    const waits: number[] = [];
     ui.exactTexts.set('View cart', [
       { ...element('View cart', 'label'), clickable: false },
       element('View cart', 'button'),
@@ -902,9 +911,66 @@ describe('Blinkit Android driver', () => {
       if (text === 'View cart') ui.sourceValue = '<hierarchy><node text="Checkout"/><node text="PAY USING"/><node text="Place Order"/></hierarchy>';
     };
 
-    await new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined }).openCart();
+    await new BlinkitAndroidDriver(ui, {
+      wait: async (milliseconds): Promise<void> => { waits.push(milliseconds); },
+    }).openCart();
 
     expect(ui.operations).toEqual(['click:View cart']);
+    expect(waits).toEqual([]);
+  });
+
+  it('uses adaptive semantic intervals until a delayed cart transition is visible', async () => {
+    const ui = new FakeUi();
+    let clock = 0;
+    const waits: number[] = [];
+    ui.sourceValue = '<hierarchy><node text="Search for atta, dal, coke and more"/><node text="View cart"/></hierarchy>';
+    ui.exactTexts.set('View cart', [element('View cart')]);
+    ui.onClick = (): void => {
+      ui.sourceValue = '<hierarchy><node text="Loading cart"/></hierarchy>';
+    };
+
+    await new BlinkitAndroidDriver(ui, {
+      now: (): number => clock,
+      wait: async (milliseconds): Promise<void> => {
+        waits.push(milliseconds);
+        clock += milliseconds;
+        if (clock >= 250) {
+          ui.sourceValue = '<hierarchy><node text="Checkout"/><node text="PAY USING"/><node text="Place Order"/></hierarchy>';
+        }
+      },
+    }).openCart();
+
+    expect(waits).toEqual([100, 150]);
+    expect(ui.clickedTexts).toEqual(['View cart']);
+    expect(clock).toBe(250);
+  });
+
+  it('stops a stalled cart transition at the bounded semantic attempt limit', async () => {
+    const ui = new FakeUi();
+    let clock = 0;
+    const waits: number[] = [];
+    ui.sourceValue = '<hierarchy><node text="Search for atta, dal, coke and more"/><node text="View cart"/></hierarchy>';
+    ui.exactTexts.set('View cart', [element('View cart')]);
+    ui.onClick = (): void => {
+      ui.sourceValue = '<hierarchy><node text="Loading cart"/></hierarchy>';
+    };
+
+    const result = new BlinkitAndroidDriver(ui, {
+      now: (): number => clock,
+      wait: async (milliseconds): Promise<void> => {
+        waits.push(milliseconds);
+        clock += milliseconds;
+      },
+    }).openCart();
+
+    await expect(result).rejects.toMatchObject({
+      name: 'SemanticConditionTimeoutError',
+      phase: 'stage_wait',
+      attempts: 4,
+    });
+    expect(waits).toEqual([100, 150, 225]);
+    expect(ui.clickedTexts).toEqual(['View cart']);
+    expect(clock).toBeLessThan(2_000);
   });
 
   it('bounds checkout polling after opening the cart', async () => {
@@ -915,8 +981,17 @@ describe('Blinkit Android driver', () => {
       ui.sourceValue = '<hierarchy><node text="Loading cart"/></hierarchy>';
     };
 
-    await expect(new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined, pollAttempts: 20 }).openCart())
-      .rejects.toThrow('Blinkit stage_wait failed');
+    const result = new BlinkitAndroidDriver(ui, {
+      wait: async (): Promise<void> => undefined,
+      pollAttempts: 20,
+    }).openCart();
+    await expect(result).rejects.toMatchObject({
+      name: 'SemanticConditionTimeoutError',
+      phase: 'stage_wait',
+      reason: 'expected_checkout_observed_unknown',
+      attempts: 4,
+    });
+    await expect(result).rejects.toBeInstanceOf(SemanticConditionTimeoutError);
 
     expect(ui.sourceCalls).toBe(5);
   });
@@ -996,6 +1071,145 @@ describe('Blinkit Android driver', () => {
     expect(ui.sourceCalls).toBe(2);
   });
 
+  it('dismisses a focused search keyboard before opening the cart for verification', async () => {
+    const ui = new FakeUi();
+    ui.sourceValue = '<hierarchy><node class="android.widget.EditText" focused="true" text="Amul milk"/></hierarchy>';
+    ui.onBack = (): void => {
+      ui.sourceValue = '<hierarchy><node text="Search for atta, dal, coke and more"/><node text="View cart" clickable="true" bounds="[20,900][1060,1040]"/></hierarchy>';
+      ui.exactTexts.set('View cart', [element('View cart')]);
+    };
+    ui.onClick = ({ text, id }): void => {
+      if (text === 'View cart' || id === 'rect') {
+        ui.sourceValue = liveCartSource([
+          { name: 'Amul Taaza Toned Milk', quantity: 1, unitPrice: 29 },
+        ]);
+      }
+    };
+
+    await expect(new BlinkitAndroidDriver(ui, {
+      wait: async (): Promise<void> => undefined,
+    }).inspectCart()).resolves.toMatchObject({
+      lines: [{ name: 'Amul Taaza Toned Milk', quantity: 1 }],
+    });
+    expect(ui.operations).toEqual(['back', 'click:View cart']);
+  });
+
+  it('restores the exact visible search offer after a mutation baseline cart read', async () => {
+    const ui = new FakeUi();
+    const title = 'Amul Taaza Toned Milk';
+    const packSize = '500 ml';
+    const price = 29;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n${packSize}\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    const searchSource = [
+      '<hierarchy>',
+      '<node content-desc="Recent searches"/>',
+      '<node text="View cart" clickable="true" bounds="[20,900][1060,1040]"/>',
+      `<offer product-id="taaza-card" title="${title}" pack-size="${packSize}" price="${price}" available="true"/>`,
+      '</hierarchy>',
+    ].join('');
+    const cart = liveCartSource([
+      { name: 'Brown Bread', quantity: 1, unitPrice: 45 },
+    ]);
+    ui.sourceValue = searchSource;
+    ui.onClick = ({ id, text }): void => {
+      if (id === 'rect' || text === 'View cart') ui.sourceValue = cart;
+    };
+    ui.onBack = (): void => {
+      ui.sourceValue = searchSource;
+    };
+    const driver = new BlinkitAndroidDriver(ui, {
+      wait: async (): Promise<void> => undefined,
+    });
+    const offer = {
+      available: true,
+      offerId,
+      packSize,
+      price: { amount: price, currency: 'INR' as const },
+      title,
+    };
+
+    await expect(driver.inspectCartPreservingVisibleOffer(offer))
+      .resolves.toMatchObject({
+        lines: [{ name: 'Brown Bread', quantity: 1 }],
+      });
+    const setQuantity = vi
+      .spyOn(driver as never, 'setCartQuantity')
+      .mockResolvedValue(undefined);
+    const after = parseLiveAndroidCart(liveCartSource([
+      { name: 'Brown Bread', quantity: 1, unitPrice: 45 },
+      { name: title, quantity: 1, unitPrice: price },
+    ]))!;
+    vi.spyOn(driver, 'inspectCart').mockResolvedValue(after);
+    const searchCandidates = vi.spyOn(
+      driver as unknown as {
+        searchCandidates(query: string, limit: number): Promise<unknown[]>;
+      },
+      'searchCandidates',
+    );
+
+    await expect(driver.upsertVisibleCartItem(offer, 1)).resolves.toMatchObject({
+      cart: {
+        lines: [
+          { name: 'Brown Bread', quantity: 1 },
+          { name: title, quantity: 1 },
+        ],
+      },
+    });
+    expect(ui.operations.slice(0, 2)).toEqual(['tap:rect', 'back']);
+    expect(setQuantity).toHaveBeenCalledOnce();
+    expect(setQuantity).toHaveBeenCalledWith('taaza-card', 1);
+    expect(searchCandidates).not.toHaveBeenCalled();
+  });
+
+  it('fails a mutation baseline before mutation when the exact search offer is not restored', async () => {
+    const ui = new FakeUi();
+    const title = 'Amul Taaza Toned Milk';
+    const packSize = '500 ml';
+    const price = 29;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n${packSize}\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    const searchSource = [
+      '<hierarchy>',
+      '<node content-desc="Recent searches"/>',
+      '<node text="View cart" clickable="true" bounds="[20,900][1060,1040]"/>',
+      `<offer product-id="taaza-card" title="${title}" pack-size="${packSize}" price="${price}" available="true"/>`,
+      '</hierarchy>',
+    ].join('');
+    ui.sourceValue = searchSource;
+    ui.onClick = (): void => {
+      ui.sourceValue = liveCartSource([
+        { name: 'Brown Bread', quantity: 1, unitPrice: 45 },
+      ]);
+    };
+    ui.onBack = (): void => {
+      ui.sourceValue = [
+        '<hierarchy>',
+        '<node content-desc="Recent searches"/>',
+        '<offer product-id="other-card" title="Amul Gold Milk" pack-size="500 ml" price="34" available="true"/>',
+        '</hierarchy>',
+      ].join('');
+    };
+    const driver = new BlinkitAndroidDriver(ui, {
+      wait: async (): Promise<void> => undefined,
+    });
+    const setQuantity = vi.spyOn(driver as never, 'setCartQuantity');
+
+    await expect(driver.inspectCartPreservingVisibleOffer({
+      available: true,
+      offerId,
+      packSize,
+      price: { amount: price, currency: 'INR' },
+      title,
+    })).rejects.toThrow('Blinkit cart_baseline_restore failed');
+    expect(setQuantity).not.toHaveBeenCalled();
+    expect(ui.operations).toEqual(['tap:rect', 'back']);
+  });
+
   it('reports an empty cart directly from the storefront when no cart control exists', async () => {
     const ui = new FakeUi();
     ui.sourceValue = '<hierarchy><node text="HOME"/><node content-desc="Search for atta, dal, coke and more"/></hierarchy>';
@@ -1070,7 +1284,11 @@ describe('Blinkit Android driver', () => {
       return [];
     };
     ui.onClick = ({ text }): void => {
-      if (text === 'Decrease quantity') quantity -= 1;
+      if (text === 'Decrease quantity') {
+        quantity -= 1;
+        ui.sourceValue = '<hierarchy><node text="Checkout"/>'
+          + `<node text="cart quantity ${quantity}"/><node text="Place Order"/><node text="PAY USING"/></hierarchy>`;
+      }
     };
     ui.onBack = (): void => {
       ui.sourceValue = '<hierarchy><node text="Search for atta, dal, coke and more"/></hierarchy>';
@@ -1095,7 +1313,11 @@ describe('Blinkit Android driver', () => {
       return [];
     };
     ui.onClick = ({ text }): void => {
-      if (text === 'Decrease quantity') quantity -= 1;
+      if (text === 'Decrease quantity') {
+        quantity -= 1;
+        ui.sourceValue = '<hierarchy><node text="Checkout"/>'
+          + `<node text="cart quantity ${quantity}"/><node text="Place Order"/><node text="PAY USING"/></hierarchy>`;
+      }
     };
     const overlayBack = ui.onBack;
     ui.onBack = (): void => {
@@ -1249,6 +1471,228 @@ describe('Blinkit Android driver', () => {
     ]);
   });
 
+  it('upserts the exact visible offer after clarification without running discovery again', async () => {
+    const ui = new FakeUi();
+    const driver = new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined });
+    const title = 'Amul Moti Toned Milk';
+    const packSize = '450 ml';
+    const price = 30;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n${packSize}\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    const searchSource = [
+      '<hierarchy>',
+      '<node content-desc="Recent searches"/>',
+      `<offer product-id="moti-card" title="${title}" pack-size="${packSize}" price="${price}" available="true"/>`,
+      '</hierarchy>',
+    ].join('');
+    const after = parseLiveAndroidCart(liveCartSource([
+      { name: 'Brown Bread', quantity: 1, unitPrice: 50 },
+      { name: title, quantity: 1, unitPrice: price },
+    ]))!;
+    vi.spyOn(
+      driver as unknown as { safeSource(stage: string): Promise<string> },
+      'safeSource',
+    ).mockResolvedValue(searchSource);
+    const inspectCart = vi.spyOn(driver, 'inspectCart').mockResolvedValueOnce(after);
+    const searchCandidates = vi.spyOn(
+      driver as unknown as {
+        searchCandidates(query: string, limit: number): Promise<unknown[]>;
+      },
+      'searchCandidates',
+    );
+    const setQuantity = vi.spyOn(driver, 'setCartQuantity').mockResolvedValue();
+    const onVerificationStarted = vi.fn();
+
+    const result = await driver.upsertVisibleCartItem({
+      available: true,
+      offerId,
+      packSize,
+      price: { amount: price, currency: 'INR' },
+      title,
+    }, 1, { onVerificationStarted });
+
+    expect(searchCandidates).not.toHaveBeenCalled();
+    expect(setQuantity).toHaveBeenCalledWith('moti-card', 1);
+    expect(onVerificationStarted).toHaveBeenCalledOnce();
+    expect(onVerificationStarted.mock.invocationCallOrder[0])
+      .toBeLessThan(inspectCart.mock.invocationCallOrder[0]!);
+    expect(inspectCart).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      changed: true,
+      cart: {
+        lines: [
+          { name: 'Brown Bread', quantity: 1 },
+          { name: title, quantity: 1 },
+        ],
+      },
+    });
+  });
+
+  it('requires reselection without broad search or mutation when an accepted exact offer disappears', async () => {
+    const ui = new FakeUi();
+    const driver = new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined });
+    const title = 'Amul Taaza Toned Milk';
+    const packSize = '500 ml';
+    const price = 29;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n${packSize}\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    vi.spyOn(
+      driver as unknown as { safeSource(stage: string): Promise<string> },
+      'safeSource',
+    ).mockResolvedValue('<hierarchy><node resource-id="z_search_bar"/></hierarchy>');
+    const searchCandidates = vi.spyOn(
+      driver as unknown as {
+        searchCandidates(query: string, limit: number): Promise<unknown[]>;
+      },
+      'searchCandidates',
+    );
+    const current = parseLiveAndroidCart(liveCartSource([
+      { name: title, quantity: 1, unitPrice: price },
+    ]))!;
+    const inspectCart = vi.spyOn(driver, 'inspectCart').mockResolvedValue(current);
+    const setQuantity = vi.spyOn(driver, 'setCartQuantity').mockResolvedValue();
+
+    let caught: unknown;
+    try {
+      await driver.upsertVisibleCartItem({
+        available: true,
+        offerId,
+        packSize,
+        price: { amount: price, currency: 'INR' },
+        title,
+      }, 1);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(BlinkitOfferSelectionStaleError);
+    expect(caught).toMatchObject({
+      code: 'offer_selection_stale',
+      offerId,
+      requiresReselection: true,
+    });
+    expect(searchCandidates).not.toHaveBeenCalled();
+    expect(setQuantity).not.toHaveBeenCalled();
+    expect(inspectCart).not.toHaveBeenCalled();
+  });
+
+  it('uses adaptive search-field probes with one hierarchy snapshot per cycle', async () => {
+    const ui = new FakeUi();
+    const searchField = element('', 'search-field');
+    const waits: number[] = [];
+    let fieldReads = 0;
+    ui.sourceValue = '<hierarchy><node content-desc="Recent searches"/></hierarchy>';
+    ui.findClassName = async (): Promise<UiElement[]> => {
+      fieldReads += 1;
+      return fieldReads === 3 ? [searchField] : [];
+    };
+    const driver = new BlinkitAndroidDriver(ui, {
+      wait: async (milliseconds): Promise<void> => {
+        waits.push(milliseconds);
+      },
+    });
+
+    const fields = await (driver as unknown as {
+      waitForSearchField(
+        phase: string,
+        attempts: number,
+      ): Promise<UiElement[]>;
+    }).waitForSearchField('test_search_field', 5);
+
+    expect(fields).toEqual([searchField]);
+    expect(fieldReads).toBe(3);
+    expect(ui.sourceCalls).toBe(3);
+    expect(waits).toEqual([100, 150]);
+  });
+
+  it('retains one stale cart observation without repeating inspection or mutation', async () => {
+    const ui = new FakeUi();
+    const driver = new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined });
+    const title = 'Amul Vanilla Magic Ice Cream Tub';
+    const price = 195;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    const searchSource = [
+      '<hierarchy>',
+      '<node content-desc="Recent searches"/>',
+      `<offer product-id="vanilla-card" title="${title}" price="${price}" available="true"/>`,
+      '</hierarchy>',
+    ].join('');
+    const stale = parseLiveAndroidCart(liveCartSource([
+      { name: 'Brown Bread', quantity: 1, unitPrice: 50 },
+    ]))!;
+    vi.spyOn(
+      driver as unknown as { safeSource(stage: string): Promise<string> },
+      'safeSource',
+    ).mockResolvedValue(searchSource);
+    const inspectCart = vi.spyOn(driver, 'inspectCart').mockResolvedValue(stale);
+    const setQuantity = vi.spyOn(driver, 'setCartQuantity').mockResolvedValue();
+
+    const result = driver.upsertVisibleCartItem({
+      available: true,
+      offerId,
+      price: { amount: price, currency: 'INR' },
+      title,
+    }, 1);
+
+    await expect(result).rejects.toMatchObject({
+      name: 'AndroidCartMutationVerificationError',
+      observedCart: stale,
+    });
+    await expect(result).rejects.toBeInstanceOf(
+      AndroidCartMutationVerificationError,
+    );
+    expect(setQuantity).toHaveBeenCalledOnce();
+    expect(inspectCart).toHaveBeenCalledOnce();
+  });
+
+  it('reconciles the cart after Blinkit adds the item but does not expose its quantity control', async () => {
+    const ui = new FakeUi();
+    const driver = new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined });
+    const title = 'Amul Gold Full Cream Milk';
+    const price = 34;
+    const offerId = `offer_${createHash('sha256')
+      .update(`${title.toLowerCase()}\n500 ml\n${price * 100}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+    vi.spyOn(
+      driver as unknown as { safeSource(stage: string): Promise<string> },
+      'safeSource',
+    ).mockResolvedValue([
+      '<hierarchy>',
+      '<node content-desc="Recent searches"/>',
+      `<offer product-id="gold-card" title="${title}" pack-size="500 ml" price="${price}" available="true"/>`,
+      '</hierarchy>',
+    ].join(''));
+    const current = parseLiveAndroidCart(liveCartSource([
+      { name: title, quantity: 1, unitPrice: price },
+    ]))!;
+    const setQuantity = vi.spyOn(driver, 'setCartQuantity')
+      .mockRejectedValue(new Error('Blinkit cart_quantity_variant failed'));
+    const inspectCart = vi.spyOn(driver, 'inspectCart').mockResolvedValue(current);
+
+    const result = await driver.upsertVisibleCartItem({
+      available: true,
+      offerId,
+      packSize: '500 ml',
+      price: { amount: price, currency: 'INR' },
+      title,
+    }, 1);
+
+    expect(setQuantity).toHaveBeenCalledOnce();
+    expect(inspectCart).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      changed: true,
+      cart: { lines: [{ name: title, quantity: 1 }] },
+    });
+  });
+
   it('rejects an exact-offer upsert when another existing cart line disappears', async () => {
     const ui = new FakeUi();
     const driver = new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined });
@@ -1289,6 +1733,7 @@ describe('Blinkit Android driver', () => {
       if (text === 'Decrease quantity') current -= 1;
       if (text === 'ADD' && rect.x === selectedAdd.rect.x) current = 1;
       if (text === 'Increase quantity') current += 1;
+      ui.sourceValue = `<hierarchy><node text="selected quantity ${current}"/></hierarchy>`;
     };
 
     await new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined })
@@ -1398,6 +1843,36 @@ describe('Blinkit Android driver', () => {
     let state: 'result' | 'sheet' | 'added' = 'result';
     ui.findExactDescription = async (label: string): Promise<UiElement[]> => {
       if (label === description) return state === 'result' ? [resultCard] : [variantCard];
+      if (label === 'ADD') return state === 'result' ? [resultAdd] : state === 'sheet' ? [variantAdd] : [];
+      if (label === 'Decrease quantity') return state === 'added' ? [decrease] : [];
+      return [];
+    };
+    ui.onClick = ({ id }): void => {
+      if (id === resultAdd.id) state = 'sheet';
+      if (id === variantAdd.id) state = 'added';
+    };
+
+    await new BlinkitAndroidDriver(ui, { wait: async (): Promise<void> => undefined })
+      .setCartQuantity(`description:${description}`, 1);
+
+    expect(state).toBe('added');
+    expect(ui.operations).toEqual(['click:ADD', 'click:ADD']);
+  });
+
+  it('selects the exact offer when a Blinkit option sheet exposes only the product title', async () => {
+    const ui = new FakeUi();
+    const title = 'Amul Gold Full Cream Milk';
+    const description = `${title} is available for ₹34`;
+    const resultCard = positioned(description, 0, 100, 300, 300);
+    const resultTitle = positioned(title, 20, 140, 220, 40);
+    const resultAdd = { ...positioned('ADD', 100, 300), id: 'result-add' };
+    const variantTitle = positioned(title, 40, 760, 260, 60);
+    const variantAdd = { ...positioned('ADD', 250, 920), id: 'variant-add' };
+    const decrease = positioned('Decrease quantity', 250, 920);
+    let state: 'result' | 'sheet' | 'added' = 'result';
+    ui.findExactDescription = async (label: string): Promise<UiElement[]> => {
+      if (label === description) return state === 'result' ? [resultCard] : [];
+      if (label === title) return state === 'result' ? [resultTitle] : [variantTitle];
       if (label === 'ADD') return state === 'result' ? [resultAdd] : state === 'sheet' ? [variantAdd] : [];
       if (label === 'Decrease quantity') return state === 'added' ? [decrease] : [];
       return [];

@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "binding": {
+    "version": 2,
+    "clientId": "pixel-overlay",
+    "taskId": "task_selection-race-12345678",
+    "taskRevision": 7,
+    "interactionId": "interaction_selection-race-12345678",
+    "selectionId": "selection_selection-race-12345678",
+    "expiresAt": 4102444800000
+  },
+  "cases": [
+    {
+      "name": "tap winner",
+      "response": {
+        "version": 2,
+        "acknowledgement": "accepted",
+        "taskId": "task_selection-race-12345678",
+        "taskRevision": 8,
+        "interactionId": "interaction_selection-race-12345678",
+        "selectionId": "selection_selection-race-12345678",
+        "resolution": {
+          "offer": {
+            "offerId": "offer_milk_500",
+            "title": "Amul Taaza Toned Milk"
+          }
+        }
+      },
+      "expected": "ACCEPTED"
+    },
+    {
+      "name": "tap loser",
+      "response": {
+        "version": 2,
+        "acknowledgement": "rejected",
+        "reason": "already_resolved",
+        "taskId": "task_selection-race-12345678",
+        "taskRevision": 8,
+        "interactionId": "interaction_selection-race-12345678",
+        "selectionId": "selection_selection-race-12345678",
+        "resolution": {
+          "offer": {
+            "offerId": "offer_milk_500",
+            "title": "Amul Taaza Toned Milk"
+          }
+        }
+      },
+      "expected": "CONFLICT"
+    },
+    {
+      "name": "voice winner without legacy ok",
+      "response": {
+        "version": 2,
+        "acknowledgement": "accepted",
+        "taskId": "task_selection-race-12345678",
+        "taskRevision": 8,
+        "interactionId": "interaction_selection-race-12345678",
+        "selectionId": "selection_selection-race-12345678",
+        "resolution": {
+          "offer": {
+            "offerId": "offer_paneer_200",
+            "title": "Amul Fresh Malai Paneer"
+          }
+        }
+      },
+      "expected": "ACCEPTED"
+    },
+    {
+      "name": "voice loser",
+      "response": {
+        "version": 2,
+        "acknowledgement": "duplicate",
+        "taskId": "task_selection-race-12345678",
+        "taskRevision": 8,
+        "interactionId": "interaction_selection-race-12345678",
+        "selectionId": "selection_selection-race-12345678",
+        "resolution": {
+          "offer": {
+            "offerId": "offer_paneer_200",
+            "title": "Amul Fresh Malai Paneer"
+          }
+        }
+      },
+      "expected": "DUPLICATE"
+    }
+  ]
+}

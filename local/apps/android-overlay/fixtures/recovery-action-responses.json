@@ -1,0 +1,91 @@
+[
+  {
+    "statusCode": 200,
+    "response": {
+      "version": 2,
+      "acknowledgement": "accepted",
+      "actionId": "check_cart_again",
+      "interactionId": "recovery_12345678",
+      "operationId": "operation_12345678",
+      "stepId": "step:first",
+      "taskId": "task_12345678",
+      "taskRevision": 8,
+      "followup": {
+        "kind": "read_only_operation",
+        "dispatched": true
+      }
+    },
+    "outcome": "ACCEPTED",
+    "strict": true,
+    "expectedActionId": "check_cart_again"
+  },
+  {
+    "statusCode": 200,
+    "response": {
+      "version": 2,
+      "acknowledgement": "duplicate",
+      "actionId": "stop_task",
+      "interactionId": "recovery_12345678",
+      "operationId": "operation_12345678",
+      "stepId": "step:first",
+      "taskId": "task_12345678",
+      "taskRevision": 8
+    },
+    "outcome": "DUPLICATE",
+    "strict": true,
+    "expectedActionId": "stop_task"
+  },
+  {
+    "statusCode": 200,
+    "response": {
+      "version": 2,
+      "acknowledgement": "accepted",
+      "actionId": "stop_task",
+      "interactionId": "recovery_wrong",
+      "operationId": "operation_12345678",
+      "stepId": "step:first",
+      "taskId": "task_12345678",
+      "taskRevision": 8
+    },
+    "outcome": "REJECTED",
+    "strict": true,
+    "expectedActionId": "stop_task"
+  },
+  {
+    "statusCode": 409,
+    "response": {
+      "version": 2,
+      "acknowledgement": "rejected",
+      "reason": "stale_revision"
+    },
+    "outcome": "STALE"
+  },
+  {
+    "statusCode": 200,
+    "response": {
+      "version": 2,
+      "acknowledgement": "accepted",
+      "actionId": "unlock_phone",
+      "interactionId": "recovery_12345678",
+      "operationId": "operation_12345678",
+      "stepId": "step:first",
+      "taskId": "task_12345678",
+      "taskRevision": 8,
+      "followup": {
+        "kind": "guidance",
+        "message": "Unlock the phone manually. JaldiAI cannot bypass the device lock."
+      }
+    },
+    "outcome": "ACCEPTED",
+    "guidance": "Unlock the phone manually. JaldiAI cannot bypass the device lock."
+  },
+  {
+    "statusCode": 503,
+    "response": {
+      "version": 2,
+      "acknowledgement": "rejected",
+      "reason": "server_unavailable"
+    },
+    "outcome": "REJECTED"
+  }
+]

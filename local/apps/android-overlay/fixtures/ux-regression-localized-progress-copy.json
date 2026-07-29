@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "providerNamesRemainVerbatim": true,
+  "locales": [
+    {
+      "languageCode": "en-IN",
+      "copy": {
+        "searching": "Searching for Amul Fresh Malai Paneer",
+        "adding": "Adding Amul Fresh Malai Paneer",
+        "verifying": "Checking the updated cart",
+        "waiting": "Choose an Amul Fresh Malai Paneer option",
+        "verified": "Amul Fresh Malai Paneer added. Now looking for chicken.",
+        "ambiguous": "Checking what happened. I won’t add Amul Fresh Malai Paneer again until it is verified.",
+        "paused": "Task paused",
+        "disconnected": "Phone connection lost. Your task is paused. No new cart action will run."
+      }
+    },
+    {
+      "languageCode": "hi-IN",
+      "copy": {
+        "searching": "Amul Fresh Malai Paneer खोज रहा हूँ",
+        "adding": "Amul Fresh Malai Paneer कार्ट में जोड़ रहा हूँ",
+        "verifying": "अपडेट किया हुआ कार्ट जाँच रहा हूँ",
+        "waiting": "Amul Fresh Malai Paneer का विकल्प चुनें",
+        "verified": "Amul Fresh Malai Paneer कार्ट में जुड़ गया। अब chicken खोज रहा हूँ।",
+        "ambiguous": "जाँच रहा हूँ कि क्या हुआ। पुष्टि होने तक Amul Fresh Malai Paneer दोबारा नहीं जोड़ूँगा।",
+        "paused": "टास्क रुका हुआ है",
+        "disconnected": "फ़ोन कनेक्शन टूट गया। आपका टास्क रुका है। कार्ट में कोई नया बदलाव नहीं होगा।"
+      }
+    },
+    {
+      "languageCode": "hi-Latn-IN",
+      "copy": {
+        "searching": "Amul Fresh Malai Paneer dhoondh raha hoon",
+        "adding": "Amul Fresh Malai Paneer cart mein add kar raha hoon",
+        "verifying": "Updated cart check kar raha hoon",
+        "waiting": "Amul Fresh Malai Paneer ka option chuniye",
+        "verified": "Amul Fresh Malai Paneer cart mein add ho gaya. Ab chicken dekh raha hoon.",
+        "ambiguous": "Check kar raha hoon ki kya hua. Verify hone tak Amul Fresh Malai Paneer dobara add nahi karunga.",
+        "paused": "Task paused hai",
+        "disconnected": "Phone connection lost. Task paused hai. Cart mein koi naya action nahi hoga."
+      }
+    }
+  ]
+}

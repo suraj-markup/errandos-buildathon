@@ -15,6 +15,7 @@ type GroceryOption = {
   product?: string;
   price?: string;
   size?: string;
+  spokenLabel?: string;
 };
 
 type CheckoutSnapshot = {
@@ -27,16 +28,30 @@ type CheckoutSnapshot = {
 };
 
 type ToolResult = {
+  cart?: {
+    lines?: Array<{
+      product?: string;
+      quantity?: number;
+      spokenLabel?: string;
+    }>;
+    subtotal?: string;
+  };
   checkout?: CheckoutSnapshot;
+  failure?: {
+    operation?: string;
+    reason?: string;
+    stage?: string;
+  };
   message?: string;
   ok?: boolean;
   options?: GroceryOption[];
   price?: string;
   product?: string;
   providerReference?: string;
-  quantity?: string;
+  quantity?: number | string;
   request?: string;
   size?: string;
+  spokenLabel?: string;
   status?: string;
 };
 
@@ -47,6 +62,10 @@ type VoiceTurnResponse = {
   error?: string;
   languageCode?: string;
   ok?: boolean;
+  productQueue?: {
+    nextProduct?: string;
+    remainingCount: number;
+  };
   reply?: string;
   toolEvents?: string[];
   toolResults?: ToolResult[];
@@ -60,7 +79,7 @@ const stateCopy: Record<VoiceState, { kicker: string; title: string; hint: strin
     title: 'On it.',
   },
   connecting: {
-    hint: 'Your microphone stays on this device.',
+    hint: 'Your voice is being sent to JaldiAI.',
     kicker: 'OPENING THE MIC',
     title: 'One sec.',
   },
@@ -92,11 +111,17 @@ const stateCopy: Record<VoiceState, { kicker: string; title: string; hint: strin
 };
 
 const eventLabels: Record<string, string> = {
-  confirm_cod_order: 'Confirming the reviewed order',
+  confirm_checkout: 'Confirming the reviewed order',
   open_blinkit: 'Opening Blinkit',
   phone_status: 'Checking your Pixel',
-  prepare_cod_checkout: 'Reading exact checkout terms',
-  prepare_grocery: 'Finding the exact product',
+  prepare_checkout: 'Reading exact checkout terms',
+  search_products: 'Searching without changing the cart',
+  select_product: 'Selecting the exact visible option',
+  skip_product: 'Skipping the current product',
+  add_cart_item: 'Adding the exact product',
+  inspect_cart: 'Reading the verified cart',
+  remove_cart_item: 'Removing the exact cart item',
+  set_cart_item_quantity: 'Updating the exact cart quantity',
 };
 
 function preferredAudioType(): string | undefined {
@@ -153,7 +178,10 @@ function ResultSheet({ result }: { result?: ToolResult }) {
     );
   }
 
-  if (result.status === 'needs_clarification' && result.options?.length) {
+  if (
+    ['needs_clarification', 'search_results'].includes(result.status ?? '')
+      && result.options?.length
+  ) {
     return (
       <section className="result-sheet choice-sheet">
         <div className="sheet-topline">
@@ -167,7 +195,7 @@ function ResultSheet({ result }: { result?: ToolResult }) {
             <li key={`${option.product ?? 'product'}-${option.size ?? index}`}>
               <span className="option-number">{String(index + 1).padStart(2, '0')}</span>
               <div>
-                <strong>{option.product ?? 'Blinkit product'}</strong>
+                <strong>{option.spokenLabel ?? option.product ?? 'Blinkit product'}</strong>
                 <p>{[option.size, option.price].filter(Boolean).join(' · ')}</p>
               </div>
             </li>
@@ -205,21 +233,60 @@ function ResultSheet({ result }: { result?: ToolResult }) {
     );
   }
 
-  if (['added', 'already_in_cart'].includes(result.status ?? '')) {
+  if (
+    ['added', 'already_in_cart', 'quantity_updated', 'removed']
+      .includes(result.status ?? '')
+  ) {
+    const resultHeading = result.status === 'removed'
+      ? 'VERIFIED REMOVAL'
+      : result.status === 'quantity_updated'
+        ? 'VERIFIED QUANTITY'
+        : 'VERIFIED IN CART';
     return (
       <section className="result-sheet success-sheet">
         <div className="sheet-topline">
-          <span>VERIFIED IN CART</span>
+          <span>{resultHeading}</span>
           <span className="checkmark">✓</span>
         </div>
         <div className="product-result">
           <span className="bag-glyph">B</span>
           <div>
-            <h2>{result.product ?? 'Item added'}</h2>
+            <h2>{result.spokenLabel ?? result.product ?? 'Cart item'}</h2>
             <p>{[result.size, result.price, result.quantity].filter(Boolean).join(' · ')}</p>
           </div>
         </div>
         <p className="safe-caption">The cart changed. No order was placed.</p>
+      </section>
+    );
+  }
+
+  if (result.status === 'cart_empty') {
+    return (
+      <section className="result-sheet neutral-sheet">
+        <div className="sheet-topline"><span>VERIFIED CART</span><span>0 items</span></div>
+        <h2>Your cart is empty.</h2>
+      </section>
+    );
+  }
+
+  if (result.status === 'cart_status' && result.cart?.lines?.length) {
+    return (
+      <section className="result-sheet choice-sheet">
+        <div className="sheet-topline">
+          <span>VERIFIED CART</span>
+          <span>{result.cart.lines.length} lines</span>
+        </div>
+        <h2>{result.cart.subtotal ?? 'Current cart'}</h2>
+        <ol className="product-options">
+          {result.cart.lines.map((line, index) => (
+            <li key={`${line.product ?? 'cart-line'}-${index}`}>
+              <span className="option-number">{line.quantity ?? 1}</span>
+              <div>
+                <strong>{line.spokenLabel ?? line.product ?? 'Cart item'}</strong>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
     );
   }
@@ -253,7 +320,11 @@ function ResultSheet({ result }: { result?: ToolResult }) {
         <span>{result.ok === false ? 'NEEDS ATTENTION' : 'PHONE UPDATE'}</span>
         <span>{result.status?.replaceAll('_', ' ') ?? 'complete'}</span>
       </div>
-      <h2>{result.message ?? 'The phone action is complete.'}</h2>
+      <h2>
+        {result.message
+          ?? result.failure?.reason?.replaceAll('_', ' ')
+          ?? 'The phone action is complete.'}
+      </h2>
       <p>Nothing paid happens without an exact review.</p>
     </section>
   );
@@ -264,6 +335,7 @@ export default function VoiceHome() {
   const [assistantText, setAssistantText] = useState('Tap me and say what you need.');
   const [latestTranscript, setLatestTranscript] = useState('');
   const [latestResult, setLatestResult] = useState<ToolResult | undefined>();
+  const [productQueue, setProductQueue] = useState<VoiceTurnResponse['productQueue']>();
   const [toolEvents, setToolEvents] = useState<string[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -303,9 +375,15 @@ export default function VoiceHome() {
 
       setLatestTranscript(result.transcript ?? '');
       setToolEvents(result.toolEvents ?? []);
-      setLatestResult(result.toolResults?.[0]);
+      setLatestResult(
+        result.toolResults?.find((toolResult) =>
+          ['confirmation_required', 'needs_clarification', 'search_results']
+            .includes(toolResult.status ?? ''))
+        ?? result.toolResults?.at(-1),
+      );
+      setProductQueue(result.productQueue);
       setAssistantText(result.reply ?? 'Done.');
-      setVoiceState(result.toolEvents?.length ? 'acting' : 'speaking');
+      setVoiceState(result.audioBase64 ? 'speaking' : 'idle');
 
       if (result.audioBase64) {
         const player = audioRef.current;
@@ -417,7 +495,7 @@ export default function VoiceHome() {
         </a>
         <div className="provider-pill">
           <span className="provider-dot" />
-          Blinkit ready
+          Blinkit local
         </div>
       </header>
 
@@ -471,6 +549,13 @@ export default function VoiceHome() {
               </li>
             ))}
           </ol>
+        </section>
+      ) : null}
+
+      {productQueue?.remainingCount ? (
+        <section className="queue-progress">
+          <span>{productQueue.remainingCount} product{productQueue.remainingCount === 1 ? '' : 's'} waiting</span>
+          {productQueue.nextProduct ? <strong>Next · {productQueue.nextProduct}</strong> : null}
         </section>
       ) : null}
 
