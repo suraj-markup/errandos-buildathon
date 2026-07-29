@@ -1,0 +1,9 @@
+{
+  "version": 99,
+  "mode": "success",
+  "primarySurface": "provider_screen",
+  "spoken": {
+    "text": "This unsupported payload must not render as success.",
+    "languageCode": "en-IN"
+  }
+}

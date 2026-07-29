@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "mode": "waiting_for_user",
+  "primarySurface": "provider_screen",
+  "currentScreen": {
+    "kind": "search_results",
+    "searchAction": "available",
+    "relevance": "product_options",
+    "verified": true
+  },
+  "attentionCue": {
+    "instruction": "check_current_screen",
+    "subject": "options"
+  },
+  "card": {
+    "type": "product_choices",
+    "selection": {
+      "version": 2,
+      "clientId": "pixel-overlay",
+      "taskId": "task_fixture-12345678",
+      "taskRevision": 3,
+      "interactionId": "interaction_fixture-12345678",
+      "selectionId": "selection_fixture-12345678",
+      "expiresAt": "2099-07-27T15:00:00.000Z"
+    },
+    "options": [
+      {
+        "offerId": "offer-1",
+        "title": "Amul Taaza Toned Milk",
+        "spokenLabel": "Taaza Toned",
+        "packSize": "500 ml"
+      },
+      {
+        "offerId": "offer-2",
+        "title": "Amul Gold Full Cream Milk",
+        "spokenLabel": "Amul Gold",
+        "packSize": "500 ml"
+      },
+      {
+        "offerId": "offer-3",
+        "title": "Mother Dairy Toned Milk",
+        "spokenLabel": "Mother Dairy",
+        "packSize": "500 ml"
+      }
+    ]
+  },
+  "spoken": {
+    "text": "I found three options. Check the options on the current screen.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

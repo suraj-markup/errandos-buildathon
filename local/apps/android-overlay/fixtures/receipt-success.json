@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "mode": "success",
+  "primarySurface": "overlay_card",
+  "card": {
+    "type": "receipt",
+    "providerReference": "BLINKIT-PREVIEW-123"
+  },
+  "spoken": {
+    "text": "Your preview receipt is verified.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "taskId": "task_reset-recovery-12345678",
+  "afterSequence": 2,
+  "earliestSequence": 8,
+  "latestSequence": 12,
+  "resetRequired": true,
+  "events": [],
+  "snapshot": {
+    "version": 2,
+    "taskId": "task_reset-recovery-12345678",
+    "taskRevision": 9,
+    "latestSequence": 12,
+    "latestEvent": {
+      "version": 2,
+      "eventId": "event_reset-reviewing-cart-12345678",
+      "taskId": "task_reset-recovery-12345678",
+      "taskRevision": 9,
+      "operationId": "operation_reset-recovery-12345678",
+      "stepId": "step_cart_review",
+      "sequence": 12,
+      "kind": "reviewing_cart",
+      "title": "Reviewing cart",
+      "detail": "Read-only recovery is checking the current cart and will not repeat the cart change.",
+      "itemPosition": {"current": 3, "total": 3},
+      "item": {
+        "title": "Cart review",
+        "requestedLabel": "final cart",
+        "index": 3,
+        "total": 3
+      },
+      "progress": {
+        "completed": 2,
+        "total": 3,
+        "nextLabel": "Cart review"
+      },
+      "occurredAt": 1785202001200,
+      "announcement": {
+        "channel": "visual_only",
+        "text": "Reviewing cart"
+      }
+    },
+    "items": [
+      {
+        "title": "Amul Milk",
+        "requestedLabel": "milk",
+        "packSize": "500 ml",
+        "quantity": 1,
+        "price": "₹29",
+        "index": 1,
+        "total": 3
+      },
+      {
+        "title": "Bread",
+        "requestedLabel": "bread",
+        "packSize": "400 g",
+        "quantity": 1,
+        "price": "₹45",
+        "index": 2,
+        "total": 3
+      },
+      {
+        "title": "Cart review",
+        "requestedLabel": "final cart",
+        "index": 3,
+        "total": 3
+      }
+    ],
+    "progress": {
+      "completed": 2,
+      "total": 3,
+      "nextLabel": "Cart review"
+    },
+    "terminal": false,
+    "updatedAt": 1785202001200
+  }
+}

@@ -6,21 +6,28 @@
     "prebuild": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "build": "next build",
     "predev": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
-    "dev": "next dev --hostname 0.0.0.0",
+    "dev": "next dev --webpack --hostname 0.0.0.0",
     "start": "next start --hostname 0.0.0.0",
+    "dead-code:check": "node --no-warnings --experimental-strip-types scripts/dead-code/check.ts --check",
+    "dead-code:report": "node --no-warnings --experimental-strip-types scripts/dead-code/check.ts --report",
+    "dead-code:test": "vitest run scripts/dead-code/analyzer.test.ts",
     "pretest": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "test": "vitest run --passWithNoTests",
+    "test:ux062": "UX062_REPORT_PATH=/tmp/errandos-ux062-multi-item-ui-matrix.json vitest run scripts/verification/ux062-multi-item-ui-matrix.test.ts --reporter=verbose",
     "pretypecheck": "pnpm --filter @errandos/contracts build && pnpm --filter @errandos/application build && pnpm --filter @errandos/provider-connectors build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@errandos/contracts": "workspace:*",
     "@errandos/provider-connectors": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1"
   }
 }

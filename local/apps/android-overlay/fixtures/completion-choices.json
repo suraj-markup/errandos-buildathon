@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "taskId": "task_fixture-12345678",
+  "afterSequence": 5,
+  "earliestSequence": 0,
+  "latestSequence": 6,
+  "resetRequired": false,
+  "events": [
+    {
+      "version": 2,
+      "eventId": "event_fixture-completion-choices",
+      "taskId": "task_fixture-12345678",
+      "taskRevision": 9,
+      "operationId": "operation_fixture-12345678",
+      "sequence": 6,
+      "kind": "waiting_for_user",
+      "title": "Choose what to do next",
+      "occurredAt": 1785200000200,
+      "announcement": {
+        "channel": "speech_and_visual",
+        "text": "Milk added. What would you like to do next?"
+      },
+      "interaction": {
+        "version": 2,
+        "interactionId": "interaction_fixture-12345678",
+        "taskId": "task_fixture-12345678",
+        "taskRevision": 9,
+        "expiresAt": 4102444800000,
+        "currentPaymentLabel": "saved UPI",
+        "choices": [
+          {"choiceId": "add_more", "enabled": true, "label": "Add more items"},
+          {"choiceId": "review_checkout", "enabled": true, "label": "Review checkout"},
+          {"choiceId": "use_current_payment", "enabled": true, "label": "Continue with saved UPI"},
+          {"choiceId": "use_cod", "enabled": true, "label": "Review with Cash on Delivery"},
+          {"choiceId": "stop", "enabled": true, "label": "Stop here"}
+        ]
+      }
+    }
+  ]
+}

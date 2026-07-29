@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "mode": "waiting_for_user",
+  "primarySurface": "overlay_card",
+  "card": {
+    "type": "product_choices",
+    "selection": {
+      "version": 2,
+      "clientId": "pixel-overlay",
+      "taskId": "task_fixture-12345678",
+      "taskRevision": 3,
+      "interactionId": "interaction_fixture-12345678",
+      "selectionId": "selection_expired-12345678",
+      "expiresAt": "2025-07-27T15:00:00.000Z"
+    },
+    "options": [
+      {
+        "offerId": "offer-1",
+        "title": "Amul Taaza Toned Milk",
+        "spokenLabel": "Taaza Toned",
+        "packSize": "500 ml"
+      }
+    ]
+  },
+  "spoken": {
+    "text": "Choose one.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

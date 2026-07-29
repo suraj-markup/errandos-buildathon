@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "mode": "ambiguous",
+  "primarySurface": "overlay_card",
+  "card": {
+    "type": "ambiguous",
+    "reconciliationId": "preview-reconciliation-1"
+  },
+  "spoken": {
+    "text": "I cannot verify the final provider result. Read-only recovery will check the current cart and will not repeat the cart change.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}

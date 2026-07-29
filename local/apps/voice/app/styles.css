@@ -473,6 +473,7 @@ h1 {
 
 .starter-card,
 .result-sheet,
+.queue-progress,
 .agent-trail {
   position: relative;
   flex: none;
@@ -556,6 +557,27 @@ h1 {
   padding: 13px 16px 11px;
   border-width: 1px;
   box-shadow: 3px 3px 0 var(--blue);
+}
+
+.queue-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+  padding: 10px 13px;
+  border-width: 1px;
+  box-shadow: 3px 3px 0 var(--sun);
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.queue-progress strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trail-heading {

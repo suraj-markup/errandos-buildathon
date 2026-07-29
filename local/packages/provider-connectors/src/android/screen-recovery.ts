@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { AndroidUiPort, UiElement } from './appium-client.js';
 import { detectBlinkitAndroidStage, type BlinkitAndroidStage } from '../blinkit/android-stage.js';
+import {
+  SemanticConditionTimeoutError,
+  waitForSemanticCondition,
+} from './adaptive-semantic-wait.js';
 
 export type ScreenRecoveryGoal = 'authenticate' | 'storefront' | 'search' | 'address' | 'checkout' | 'payment';
 
@@ -52,9 +56,13 @@ export class BoundedScreenRecovery implements ScreenRecoveryPort {
   }
 
   public async recover(goal: ScreenRecoveryGoal, expected: readonly BlinkitAndroidStage[]): Promise<BlinkitAndroidStage> {
+    let pendingObservation:
+      { source: string; stage: BlinkitAndroidStage }
+      | undefined;
     for (let actionCount = 0; actionCount <= this.maxActions; actionCount += 1) {
-      const source = await this.ui.source();
-      const stage = detectBlinkitAndroidStage(source);
+      const observation = pendingObservation ?? await this.readObservation();
+      pendingObservation = undefined;
+      const { source, stage } = observation;
       if (expected.includes(stage)) return stage;
       if (actionCount === this.maxActions) return stage;
 
@@ -75,9 +83,46 @@ export class BoundedScreenRecovery implements ScreenRecoveryPort {
         if (matches.length !== 1) return stage;
         await this.ui.click(matches[0]!);
       }
-      await this.wait(500);
+      pendingObservation = await this.waitForSemanticTransition(
+        stage,
+        expected,
+      );
     }
     return 'unknown';
+  }
+
+  private async readObservation(): Promise<{
+    source: string;
+    stage: BlinkitAndroidStage;
+  }> {
+    const source = await this.ui.source();
+    return { source, stage: detectBlinkitAndroidStage(source) };
+  }
+
+  private async waitForSemanticTransition(
+    previousStage: BlinkitAndroidStage,
+    expected: readonly BlinkitAndroidStage[],
+  ): Promise<{ source: string; stage: BlinkitAndroidStage } | undefined> {
+    try {
+      return (await waitForSemanticCondition({
+        acquireSnapshot: () => this.readObservation(),
+        deadlineMs: 500,
+        evaluate: (observation) => (
+          expected.includes(observation.stage)
+          || observation.stage !== previousStage
+        )
+          ? { satisfied: true, value: observation }
+          : { satisfied: false, reason: 'screen_unchanged' as const },
+        initialIntervalMs: 100,
+        maxAttempts: 5,
+        maxIntervalMs: 500,
+        phase: 'screen_recovery_transition',
+        wait: this.wait,
+      })).value;
+    } catch (error) {
+      if (error instanceof SemanticConditionTimeoutError) return undefined;
+      throw error;
+    }
   }
 }
 

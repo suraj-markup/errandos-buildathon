@@ -1,0 +1,55 @@
+{
+  "cases": [
+    {
+      "name": "missing verification",
+      "card": {
+        "type": "cart_summary",
+        "ordered": false,
+        "cart": {
+          "lines": [],
+          "subtotal": {"currency": "INR", "amount": 0}
+        }
+      },
+      "expected": "downgrade"
+    },
+    {
+      "name": "explicitly unverified",
+      "card": {
+        "type": "cart_summary",
+        "ordered": false,
+        "cart": {
+          "verified": false,
+          "lines": [],
+          "subtotal": {"currency": "INR", "amount": 0}
+        }
+      },
+      "expected": "downgrade"
+    },
+    {
+      "name": "order state missing",
+      "card": {
+        "type": "cart_summary",
+        "cart": {
+          "verified": true,
+          "lines": [],
+          "subtotal": {"currency": "INR", "amount": 0}
+        }
+      },
+      "expected": "downgrade"
+    },
+    {
+      "name": "already ordered",
+      "card": {
+        "type": "cart_summary",
+        "ordered": true,
+        "cart": {
+          "verified": true,
+          "lines": [],
+          "subtotal": {"currency": "INR", "amount": 0}
+        }
+      },
+      "expected": "downgrade"
+    }
+  ],
+  "forbiddenHeadline": "VERIFIED CART · NOT ORDERED"
+}

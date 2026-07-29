@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "sourcePatterns": [
+    "*.spec.ts",
+    "*.spec.tsx",
+    "*.test.ts",
+    "*.test.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "middleware.ts",
+    "next.config.ts",
+    "proxy.ts",
+    "scripts/**/*.ts"
+  ],
+  "productionEntrypoints": [
+    "app/**/layout.ts",
+    "app/**/layout.tsx",
+    "app/**/manifest.ts",
+    "app/**/page.ts",
+    "app/**/page.tsx",
+    "app/**/route.ts",
+    "app/**/route.tsx",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "middleware.ts",
+    "next.config.ts",
+    "proxy.ts"
+  ],
+  "testEntrypoints": [
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "scriptEntrypoints": [
+    "scripts/**/*.ts"
+  ],
+  "exceptionManifest": "scripts/dead-code/exceptions.json"
+}

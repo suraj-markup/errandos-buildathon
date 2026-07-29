@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "category": "compatibility",
+      "owner": "voice-v2-migration",
+      "removeBy": "2026-09-15",
+      "reason": "Preserve migration contracts until the V2 cutover removes compatibility consumers.",
+      "findings": [
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#CheckoutGraphEventV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#CheckoutGraphNodeV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#CheckoutGraphPhaseV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#CheckoutNodeKindV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#CheckoutNodeStatusV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/checkout-graph.ts#InvalidCheckoutGraphTransitionV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/orchestration-service.ts#CheckoutOrchestrationEventKindV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/orchestration-service.ts#CheckoutOrchestrationEventV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/orchestration-service.ts#CheckoutReconciliationObservationV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/cart-mutation-execution-truth.ts#CartMutationAttemptResultV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/cart-mutation-execution-truth.ts#FinishCartMutationInputV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/cart-mutation-execution-truth.ts#PrepareCartMutationInputV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/cart-mutation-execution-truth.ts#ReconcileCartMutationInputV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/runtime-adapter.ts#checkoutOrchestrationRepositoryV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/runtime-adapter.ts#checkoutOrchestrationServiceV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/runtime-adapter.ts#durableCheckoutRecoveryServiceV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/checkout/v2/runtime-adapter.ts#voiceTurnCheckoutAdapterV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/file-idempotency-persistence.ts#OperationIdempotencyPersistenceStateV2"
+        },
+        {
+          "kind": "export",
+          "target": "lib/execution/v2/file-idempotency-persistence.ts#OperationIdempotencyPersistenceTransactionV2"
+        },
+        {
+          "kind": "file",
+          "target": "lib/checkout/v2/index.ts"
+        },
+        {
+          "kind": "file",
+          "target": "lib/execution/v2/index.ts"
+        }
+      ]
+    },
+    {
+      "category": "feature_flag",
+      "owner": "voice-realtime",
+      "removeBy": "2026-08-31",
+      "reason": "Retain the guarded Realtime rollout surface through its scheduled migration review.",
+      "findings": [
+        {
+          "kind": "export",
+          "target": "lib/realtime/cancellation-domains.ts#PhoneTaskCancellationController"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/cancellation-domains.ts#PushToTalkInterruptionResultV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/cancellation-domains.ts#SarvamPlaybackController"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/control-session.ts#RealtimeControlConfig"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/control-session.ts#RealtimeControlState"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/control-session.ts#RealtimeControlTurn"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/provider-adapter.ts#RealtimeControlRequestContextV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/quality-report.ts#LocalQualityGroupV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/quality-report.ts#LocalQualityPipelineReportV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/quality-report.ts#RedactedDeviceStageV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/quality-report.ts#RedactedFallbackReasonV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#GuardedControlFallbackReason"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#GuardedControlResultV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#RealtimeRolloutGateResultV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#RealtimeRolloutGateThresholdsV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#RealtimeRolloutPolicyInput"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#RealtimeRolloutPolicyV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#RealtimeRolloutStage"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/rollout-controller.ts#realtimeRolloutStages"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/safe-phone-tools.ts#SafeRealtimeToolErrorCode"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/safe-phone-tools.ts#SafeRealtimeToolName"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/shadow-coordinator.ts#ControlShadowEvaluatorContext"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/shadow-coordinator.ts#SuppressedToolCallResultV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/shadow-corpus.ts#ControlShadowExpectationV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/shadow-runtime.ts#RealtimeShadowEvaluationArtifactsV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/shadow-scorer.ts#ControlShadowLanguageScoreV1"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/tool-bridge.ts#RealtimeSafeToolExecutor"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeServerAuth"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportCorrelation"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportError"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportErrorMetadata"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportEventMetadata"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportOptions"
+        },
+        {
+          "kind": "export",
+          "target": "lib/realtime/websocket-transport.ts#RealtimeTransportState"
+        }
+      ]
+    }
+  ]
+}

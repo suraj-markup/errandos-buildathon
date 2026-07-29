@@ -12,6 +12,10 @@ export function detectBlinkitAndroidStage(source: string): BlinkitAndroidStage {
   if (text.includes('select delivery location') || text.includes('your saved addresses')) return 'address_picker';
   if (text.includes('one time password') || text.includes('verification code')) return 'otp_requested';
   if (text.includes('log in or sign up') || (text.includes("india's last minute app") && text.includes('continue'))) return 'login_required';
+  if (
+    text.includes('com.grofers.customerapp:id/z_search_bar')
+    && text.includes('com.grofers.customerapp:id/bottom_nav_bar')
+  ) return 'storefront';
   if (text.includes('view cart') || text.includes('search for atta')) return 'storefront';
   return 'unknown';
 }

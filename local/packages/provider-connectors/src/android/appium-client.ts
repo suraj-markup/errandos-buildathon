@@ -6,6 +6,16 @@ export interface UiElement {
   clickable: boolean;
 }
 
+export type AndroidScreenOrientation = 'LANDSCAPE' | 'PORTRAIT';
+
+export interface ReadOnlyAndroidScreenPort {
+  currentPackage(): Promise<string>;
+  orientation(): Promise<AndroidScreenOrientation>;
+  screenshot(): Promise<Uint8Array>;
+  source(): Promise<string>;
+  windowRect(): Promise<UiElement['rect']>;
+}
+
 export interface AndroidUiPort {
   source(): Promise<string>;
   findExactText(text: string): Promise<UiElement[]>;
@@ -38,6 +48,7 @@ export interface AndroidUiPort {
 }
 
 export interface AppiumOpenOptions {
+  activateApp?: boolean;
   endpoint?: string;
   fetch?: typeof fetch;
   requestTimeoutMs?: number;
@@ -114,7 +125,7 @@ export class AppiumHttpClient implements AndroidUiPort {
     if (!sessionId) throw new Error('Appium session_start failed');
     const client = new AppiumHttpClient(endpoint, sessionId, fetcher, requestTimeoutMs, appPackage);
     try {
-      await client.activateApp();
+      if (options.activateApp !== false) await client.activateApp();
       return client;
     } catch (error) {
       await client.close();
@@ -122,7 +133,7 @@ export class AppiumHttpClient implements AndroidUiPort {
     }
   }
 
-  private async activateApp(): Promise<void> {
+  public async activateApp(): Promise<void> {
     await this.call('/execute/sync', 'app_activate', {
       method: 'POST',
       body: JSON.stringify({
@@ -135,6 +146,41 @@ export class AppiumHttpClient implements AndroidUiPort {
   public async source(): Promise<string> {
     const value = await this.call('/source', 'source_read');
     if (typeof value !== 'string') throw new Error('Appium source_read failed');
+    return value;
+  }
+
+  public async screenshot(): Promise<Uint8Array> {
+    const value = await this.call('/screenshot', 'screenshot_read');
+    if (typeof value !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+      throw new Error('Appium screenshot_read failed');
+    }
+    const image = Buffer.from(value, 'base64');
+    if (image.byteLength === 0) throw new Error('Appium screenshot_read failed');
+    return new Uint8Array(image);
+  }
+
+  public async currentPackage(): Promise<string> {
+    const value = await this.call(
+      '/appium/device/current_package',
+      'current_package_read',
+    );
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error('Appium current_package_read failed');
+    }
+    return value;
+  }
+
+  public async orientation(): Promise<AndroidScreenOrientation> {
+    const value = await this.call('/orientation', 'orientation_read');
+    if (value !== 'LANDSCAPE' && value !== 'PORTRAIT') {
+      throw new Error('Appium orientation_read failed');
+    }
+    return value;
+  }
+
+  public async windowRect(): Promise<UiElement['rect']> {
+    const value = await this.call('/window/rect', 'window_rect');
+    if (!isRect(value)) throw new Error('Appium window_rect failed');
     return value;
   }
 

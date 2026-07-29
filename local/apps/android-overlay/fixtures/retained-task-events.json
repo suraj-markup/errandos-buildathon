@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "taskId": "task_fixture-12345678",
+  "afterSequence": 3,
+  "earliestSequence": 0,
+  "latestSequence": 5,
+  "resetRequired": false,
+  "events": [
+    {
+      "version": 2,
+      "eventId": "event_fixture-milk-verified",
+      "taskId": "task_fixture-12345678",
+      "taskRevision": 8,
+      "operationId": "operation_fixture-12345678",
+      "stepId": "step_milk",
+      "sequence": 4,
+      "kind": "mutation_verified",
+      "title": "Milk added",
+      "detail": "The requested cart state was verified.",
+      "itemPosition": {"current": 1, "total": 2},
+      "occurredAt": 1785200000000,
+      "announcement": {
+        "channel": "visual_only",
+        "text": "Milk added."
+      }
+    },
+    {
+      "version": 2,
+      "eventId": "event_fixture-next-ice-cream",
+      "taskId": "task_fixture-12345678",
+      "taskRevision": 8,
+      "operationId": "operation_fixture-12345678",
+      "stepId": "step_ice_cream",
+      "sequence": 5,
+      "kind": "moving_to_next_step",
+      "title": "Next: ice cream",
+      "detail": "Preparing to search for ice cream.",
+      "itemPosition": {"current": 1, "total": 2},
+      "occurredAt": 1785200000100,
+      "announcement": {
+        "channel": "speech_and_visual",
+        "text": "Milk added. Now searching for ice cream."
+      }
+    }
+  ]
+}

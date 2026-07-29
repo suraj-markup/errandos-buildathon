@@ -1,0 +1,149 @@
+{
+  "version": 2,
+  "taskId": "task_12345678",
+  "afterSequence": 0,
+  "earliestSequence": 1,
+  "latestSequence": 3,
+  "resetRequired": false,
+  "events": [
+    {
+      "version": 2,
+      "eventId": "event_server_blocked",
+      "taskId": "task_12345678",
+      "taskRevision": 4,
+      "operationId": "operation_12345678",
+      "stepId": "step_server",
+      "sequence": 1,
+      "kind": "blocked",
+      "title": "Task paused",
+      "detail": "Connection recovery is required.",
+      "itemPosition": {
+        "current": 1,
+        "total": 2
+      },
+      "occurredAt": 1785202001000,
+      "announcement": {
+        "channel": "visual_only",
+        "text": "JaldiAI server unavailable."
+      },
+      "recoveryInteraction": {
+        "version": 2,
+        "interactionId": "recovery_12345678",
+        "operationId": "operation_12345678",
+        "stepId": "step_server",
+        "taskId": "task_12345678",
+        "taskRevision": 4,
+        "expiresAt": 1785202901000
+      },
+      "issue": {
+        "version": 2,
+        "code": "server_unreachable",
+        "treatment": "connection_blocked",
+        "queueBehavior": "pause_task",
+        "title": "JaldiAI server unavailable",
+        "detail": "Task updates are paused until the server reconnects.",
+        "recoveryActions": [
+          {
+            "version": 2,
+            "actionId": "reconnect_server",
+            "label": "Reconnect",
+            "safety": "read_only"
+          },
+          {
+            "version": 2,
+            "actionId": "stop_task",
+            "label": "Stop task",
+            "safety": "stop_only"
+          }
+        ]
+      }
+    },
+    {
+      "version": 2,
+      "eventId": "event_verified_not_applied",
+      "taskId": "task_12345678",
+      "taskRevision": 5,
+      "operationId": "operation_22345678",
+      "stepId": "step_add",
+      "sequence": 2,
+      "kind": "blocked",
+      "title": "Cart change was not applied",
+      "detail": "The cart was checked.",
+      "itemPosition": {
+        "current": 1,
+        "total": 2
+      },
+      "occurredAt": 1785202002000,
+      "issue": {
+        "version": 2,
+        "code": "mutation_verified_not_applied",
+        "treatment": "safe_failure",
+        "queueBehavior": "pause_current_item",
+        "title": "Cart change was not applied",
+        "detail": "A fresh check proved the requested cart change did not happen.",
+        "recoveryActions": [
+          {
+            "version": 2,
+            "actionId": "retry_verified_not_applied",
+            "label": "Try the cart change again",
+            "safety": "verified_not_applied_only"
+          },
+          {
+            "version": 2,
+            "actionId": "stop_task",
+            "label": "Stop task",
+            "safety": "stop_only"
+          }
+        ]
+      }
+    },
+    {
+      "version": 2,
+      "eventId": "event_reconciliation",
+      "taskId": "task_12345678",
+      "taskRevision": 6,
+      "operationId": "operation_32345678",
+      "stepId": "step_reconcile",
+      "sequence": 3,
+      "kind": "ambiguous",
+      "title": "Cart verification required",
+      "detail": "The queue is stopped.",
+      "itemPosition": {
+        "current": 1,
+        "total": 2
+      },
+      "occurredAt": 1785202003000,
+      "recoveryInteraction": {
+        "version": 2,
+        "interactionId": "recovery_32345678",
+        "operationId": "operation_32345678",
+        "stepId": "step_reconcile",
+        "taskId": "task_12345678",
+        "taskRevision": 6,
+        "expiresAt": 1785202903000
+      },
+      "issue": {
+        "version": 2,
+        "code": "reconciliation_required",
+        "treatment": "reconciliation",
+        "queueBehavior": "stop_queue",
+        "title": "Cart verification required",
+        "detail": "JaldiAI must read the current cart before any retry.",
+        "recoveryActions": [
+          {
+            "version": 2,
+            "actionId": "check_cart_again",
+            "label": "Check cart again",
+            "safety": "read_only"
+          },
+          {
+            "version": 2,
+            "actionId": "stop_task",
+            "label": "Stop task",
+            "safety": "stop_only"
+          }
+        ]
+      }
+    }
+  ]
+}

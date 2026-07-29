@@ -1,0 +1,35 @@
+{
+  "taskId": "task_race-restart-12345678",
+  "scenarios": [
+    {
+      "name": "duplicate does not advance",
+      "restoredAfterSequence": 7,
+      "receivedSequences": [7, 8],
+      "acceptedSequences": [8]
+    },
+    {
+      "name": "gap does not advance",
+      "restoredAfterSequence": 8,
+      "receivedSequences": [10],
+      "acceptedSequences": [],
+      "reconnectAfterSequence": 8
+    },
+    {
+      "name": "disconnect ambiguity reconcile",
+      "states": [
+        "disconnected",
+        "ambiguous",
+        "reviewing_cart",
+        "completed"
+      ],
+      "ambiguityTerminal": false,
+      "copy": "Read-only recovery will check the current cart and will not repeat the cart change."
+    },
+    {
+      "name": "explicit cancelled terminal",
+      "states": ["reviewing_cart", "cancelled"],
+      "cancelledTerminal": true,
+      "pollAfterCancelled": false
+    }
+  ]
+}

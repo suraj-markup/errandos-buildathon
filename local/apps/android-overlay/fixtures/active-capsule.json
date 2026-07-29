@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "mode": "acting",
+  "primarySurface": "overlay_card",
+  "card": {
+    "type": "compact_status",
+    "tone": "active"
+  },
+  "spoken": {
+    "text": "Searching for Lay’s.",
+    "languageCode": "en-IN"
+  },
+  "behavior": {
+    "autoCollapse": false,
+    "keepVisibleWhileSpeaking": true
+  }
+}
