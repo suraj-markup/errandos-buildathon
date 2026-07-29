@@ -14,8 +14,18 @@ const rapidoWorkflow = async (): Promise<string> =>
     new URL('../../../hermes/skills/errandos/references/rapido-android-workflow.md', import.meta.url),
     'utf8',
   );
+const voiceReference = async (): Promise<string> =>
+  readFile(
+    new URL('../../../hermes/skills/errandos/references/sarvam-telegram-voice.md', import.meta.url),
+    'utf8',
+  );
+const renderingExamples = async (): Promise<string> =>
+  readFile(
+    new URL('../../../hermes/skills/errandos/references/rendering-examples.md', import.meta.url),
+    'utf8',
+  );
 
-describe('Hermes JaldiAI skill', () => {
+describe('Hermes ErrandOS skill', () => {
   it('uses the canonical asynchronous Blinkit preparation tools', async () => {
     const content = await skill();
 
@@ -56,11 +66,15 @@ describe('Hermes JaldiAI skill', () => {
     expect(reference).toContain('Never place a proposal after its `expiresAt`');
   });
 
-  it('keeps raw Android controls and screen state outside the agent boundary', async () => {
+  it('keeps raw Android controls outside the agent boundary and narrows owner evidence', async () => {
     const content = await skill();
 
-    expect(content).toContain('Never expose Appium, ADB, coordinates, selectors, UI XML, screenshots');
-    expect(content).toContain('Known location prompts, review prompts, and provider overlays are handled inside JaldiAI');
+    expect(content).toContain('Never expose Appium, ADB, coordinates, selectors, UI XML, device sessions');
+    expect(content).toContain(
+      'Screenshots remain prohibited except for the dedicated owner-only post-order evidence helper',
+    );
+    expect(content).toContain('Never use the image to infer success');
+    expect(content).toContain('Known location prompts, review prompts, and provider overlays are handled inside ErrandOS');
   });
 
   it('uses the sanitized current-screen tool for bounded semantic diagnosis', async () => {
@@ -118,6 +132,22 @@ describe('Hermes JaldiAI skill', () => {
     expect(content).toContain('`blinkit_prepare_existing_cart_cod_order`');
     expect(reference).toContain('`blinkit_import_shared_cart`');
     expect(reference).toContain('render the complete verified resulting cart');
+  });
+
+  it('sends one verified post-commit voice completion with COD amount and ETA', async () => {
+    const content = await skill();
+    const voice = await voiceReference();
+    const examples = await renderingExamples();
+
+    expect(content).toContain('After a Blinkit placement or reconciliation returns `committed`, call `blinkit_order_status`');
+    expect(content).toContain('keep ₹{total} ready for Cash on Delivery');
+    expect(content).toContain('expected in {etaMinutes} minutes');
+    expect(content).toContain('the final completion must be sent as a voice note');
+    expect(content).toContain('do not generate success speech while the result is `ambiguous`');
+    expect(voice).toContain('mandatory final voice-notification event');
+    expect(voice).toContain('do not generate separate voice notes for the status lookup or internal tool progress');
+    expect(examples).toContain('Please keep ₹50 ready for Cash on Delivery.');
+    expect(examples).toContain('It should arrive in 12 minutes.');
   });
 
   it('uses exact Rapido ride proposals and never retries an uncertain final request', async () => {

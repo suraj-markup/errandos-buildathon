@@ -295,25 +295,35 @@ async function executeLocally(request: AndroidWorkerRequestV1): Promise<AndroidW
         checkout: await driver.prepareExistingCheckout(),
       };
       case 'commit_once': {
+        const store = new FileAndroidCommitStore(process.env['ERRANDOS_ANDROID_COMMIT_ROOT'] ?? '/var/lib/errandos/commit');
         const result = await commitOnce(request.expected, {
-          store: new FileAndroidCommitStore(process.env['ERRANDOS_ANDROID_COMMIT_ROOT'] ?? '/var/lib/errandos/commit'),
+          store,
           readCheckout: () => driver.readCheckoutReview(
             request.expected.checkout.addressReference,
             request.expected.checkout.addressLabel,
             request.expected.checkout,
           ),
           clickFinal: () => driver.clickFinalOrderOnce(),
-          readConfirmation: () => driver.readConfirmation(),
+          readConfirmation: () => driver.readConfirmation(request.expected),
         });
         return result.outcome === 'committed'
           ? { version: 1, operation: request.operation, status: 'committed', providerReference: result.providerReference }
           : { version: 1, operation: request.operation, status: result.outcome };
       }
       case 'reconcile': {
+        const store = new FileAndroidCommitStore(process.env['ERRANDOS_ANDROID_COMMIT_ROOT'] ?? '/var/lib/errandos/commit');
+        const dispatch = await store.get(request.expected.idempotencyKey);
         const result = await reconcileFromOrderHistory(request.expected, {
-          readOrders: () => driver.readOrderHistory(request.expected),
+          readOrders: () => driver.readOrderHistory(
+            request.expected,
+            dispatch ? new Date(dispatch.dispatchedAt) : undefined,
+          ),
         });
+        if (result.outcome === 'committed' && dispatch) {
+          await store.recordOutcome(request.expected.idempotencyKey, 'committed', result.providerReference);
+        }
         return result.outcome === 'committed'
+          && dispatch
           ? { version: 1, operation: request.operation, status: 'committed', providerReference: result.providerReference }
           : { version: 1, operation: request.operation, status: 'pending' };
       }

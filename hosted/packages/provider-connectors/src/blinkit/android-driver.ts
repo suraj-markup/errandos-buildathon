@@ -1007,18 +1007,26 @@ export class BlinkitAndroidDriver {
     }
   }
 
-  public async readConfirmation(): Promise<{ status: 'committed'; providerReference: string } | { status: 'unverified' }> {
+  public async readConfirmation(
+    expected?: AndroidExpectedCheckoutV1,
+    observedAt = new Date(),
+  ): Promise<{ status: 'committed'; providerReference: string } | { status: 'unverified' }> {
     const source = await this.safeSource('confirmation_read');
     if (detectBlinkitAndroidStage(source) !== 'confirmed') return { status: 'unverified' };
     const taggedReference = parseTags(source, 'order')[0]?.['provider-reference'];
     const textReference = /(?:order\s*(?:id|number|#)\s*[:#-]?\s*)([A-Za-z0-9-]{4,100})/i.exec(source)?.[1];
     const providerReference = taggedReference ?? textReference;
-    return providerReference ? { status: 'committed', providerReference } : { status: 'unverified' };
+    if (providerReference) return { status: 'committed', providerReference };
+    if (!expected) return { status: 'unverified' };
+    const matches = parseAndroidOrderCandidates(source, expected, observedAt);
+    return matches.length === 1
+      ? { status: 'committed', providerReference: matches[0]!.providerReference }
+      : { status: 'unverified' };
   }
 
-  public async readOrderHistory(expected: AndroidExpectedCheckoutV1): Promise<AndroidOrderCandidate[]> {
+  public async readOrderHistory(expected: AndroidExpectedCheckoutV1, observedAt?: Date): Promise<AndroidOrderCandidate[]> {
     const initial = await this.safeSource('order_history');
-    const immediate = parseAndroidOrderCandidates(initial, expected, new Date());
+    const immediate = parseAndroidOrderCandidates(initial, expected, observedAt);
     if (immediate.length > 0) return immediate;
     return parseAndroidOrderCandidates(await this.openOrderHistory(initial), expected);
   }

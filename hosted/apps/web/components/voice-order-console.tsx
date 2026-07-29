@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, type ReactNode, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type {
   ApiErrorResponse,
   ChatResponse,
@@ -8,8 +8,15 @@ import type {
   SupportedLanguageCode,
   TranscriptionResponse,
 } from '../lib/api-contracts';
-import { audioFilename, selectRecorderFormat } from '../lib/audio-recording';
+import {
+  audioFilename,
+  MIN_RECORDING_MS,
+  recordingReadyForUpload,
+  selectRecorderFormat,
+} from '../lib/audio-recording';
+import { extractSpeakableText, hasRichMessageContent } from '../lib/message-content';
 import { stripFactMarkers } from '../lib/safe-localization';
+import { MessageContent } from './message-content';
 
 type Stage = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking';
 
@@ -18,6 +25,7 @@ interface Message {
   role: 'agent' | 'user';
   text: string;
   audioDataUrl?: string;
+  shareUrl?: string;
 }
 
 interface LanguageOption {
@@ -28,26 +36,46 @@ interface LanguageOption {
 }
 
 const LANGUAGES: readonly LanguageOption[] = [
+  { code: 'en-IN', label: 'English', nativeLabel: 'English', sample: 'Find one litre of milk' },
+  { code: 'hi-IN', label: 'Hindi', nativeLabel: 'हिन्दी', sample: 'एक लीटर दूध खोजें' },
   { code: 'kn-IN', label: 'Kannada', nativeLabel: 'ಕನ್ನಡ', sample: 'ಒಂದು ಲೀಟರ್ ಹಾಲು ಹುಡುಕಿ' },
   { code: 'ta-IN', label: 'Tamil', nativeLabel: 'தமிழ்', sample: 'ஒரு லிட்டர் பால் தேடுங்கள்' },
   { code: 'mr-IN', label: 'Marathi', nativeLabel: 'मराठी', sample: 'एक लिटर दूध शोधा' },
-  { code: 'hi-IN', label: 'Hindi', nativeLabel: 'हिन्दी', sample: 'एक लीटर दूध खोजें' },
-  { code: 'en-IN', label: 'English', nativeLabel: 'English', sample: 'Find one litre of milk' },
+  { code: 'te-IN', label: 'Telugu', nativeLabel: 'తెలుగు', sample: 'ఒక లీటర్ పాలు వెతకండి' },
+  { code: 'bn-IN', label: 'Bengali', nativeLabel: 'বাংলা', sample: 'এক লিটার দুধ খুঁজুন' },
+  { code: 'gu-IN', label: 'Gujarati', nativeLabel: 'ગુજરાતી', sample: 'એક લિટર દૂધ શોધો' },
+  { code: 'ml-IN', label: 'Malayalam', nativeLabel: 'മലയാളം', sample: 'ഒരു ലിറ്റർ പാൽ കണ്ടെത്തൂ' },
+  { code: 'pa-IN', label: 'Punjabi', nativeLabel: 'ਪੰਜਾਬੀ', sample: 'ਇੱਕ ਲੀਟਰ ਦੁੱਧ ਲੱਭੋ' },
+  { code: 'od-IN', label: 'Odia', nativeLabel: 'ଓଡ଼ିଆ', sample: 'ଏକ ଲିଟର କ୍ଷୀର ଖୋଜନ୍ତୁ' },
+  { code: 'as-IN', label: 'Assamese', nativeLabel: 'অসমীয়া', sample: 'এলিটাৰ গাখীৰ বিচাৰক' },
+  { code: 'ur-IN', label: 'Urdu', nativeLabel: 'اردو', sample: 'ایک لیٹر دودھ تلاش کریں' },
+  { code: 'ne-IN', label: 'Nepali', nativeLabel: 'नेपाली', sample: 'एक लिटर दूध खोज्नुहोस्' },
+  { code: 'kok-IN', label: 'Konkani', nativeLabel: 'कोंकणी', sample: 'एक लिटर दूध सोद' },
+  { code: 'ks-IN', label: 'Kashmiri', nativeLabel: 'کٲشُر', sample: 'Find one litre of milk' },
+  { code: 'sd-IN', label: 'Sindhi', nativeLabel: 'سنڌي', sample: 'هڪ ليٽر کير ڳوليو' },
+  { code: 'sa-IN', label: 'Sanskrit', nativeLabel: 'संस्कृतम्', sample: 'एकं लीटरं दुग्धं अन्विष्यतु' },
+  { code: 'mai-IN', label: 'Maithili', nativeLabel: 'मैथिली', sample: 'एक लीटर दूध खोजू' },
+  { code: 'doi-IN', label: 'Dogri', nativeLabel: 'डोगरी', sample: 'इक लीटर दूध तुप्पो' },
+  { code: 'brx-IN', label: 'Bodo', nativeLabel: 'बड़ो', sample: 'Find one litre of milk' },
+  { code: 'mni-IN', label: 'Manipuri', nativeLabel: 'মৈতৈলোন্', sample: 'Find one litre of milk' },
+  { code: 'sat-IN', label: 'Santali', nativeLabel: 'ᱥᱟᱱᱛᱟᱲᱤ', sample: 'Find one litre of milk' },
 ];
 
 const STAGE_LABELS: Record<Stage, string> = {
   idle: 'Ready when you are',
   recording: 'Listening… tap to finish',
   transcribing: 'Understanding your language…',
-  thinking: 'Hermes is working on your errand…',
+  thinking: 'JaldiAI is working on your task…',
   speaking: 'Preparing your spoken response…',
 };
 
-const INITIAL_MESSAGES: readonly Message[] = [{
+const welcomeMessage = (publicCartHandoff: boolean): Message => ({
   id: 'welcome',
   role: 'agent',
-  text: 'Namaskara. Tell me what you need in the language you use at home. I will prepare the errand and show the exact terms before anything happens.',
-}];
+  text: publicCartHandoff
+    ? 'Namaskara. You are using Suraj’s shared account. I can search, build a cart, and give you an official Blinkit share link. COD and order placement are not available here.'
+    : 'Namaskara. I’m JaldiAI. Tell me what you need—or ask about your cart, an address, an order, or a ride. I will show the exact details before any final action.',
+});
 
 const createId = (): string => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
@@ -77,18 +105,57 @@ function ArrowIcon(): ReactNode {
   return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h13M14 7l5 5-5 5" /></svg>;
 }
 
-export function VoiceOrderConsole(): ReactNode {
-  const [messages, setMessages] = useState<Message[]>([...INITIAL_MESSAGES]);
+function HandoffIcon(): ReactNode {
+  return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 5h11v11M19 5 9 15M15 19H5V9" /></svg>;
+}
+
+function ChevronIcon(): ReactNode {
+  return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4" /></svg>;
+}
+
+interface VoiceOrderConsoleProps {
+  publicCartHandoff?: boolean;
+}
+
+const MAX_RECORDING_MS = 60_000;
+
+export function VoiceOrderConsole({ publicCartHandoff = false }: VoiceOrderConsoleProps): ReactNode {
+  const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage(publicCartHandoff)]);
   const [input, setInput] = useState('');
-  const [languageCode, setLanguageCode] = useState<SupportedLanguageCode>('kn-IN');
+  const [languageCode, setLanguageCode] = useState<SupportedLanguageCode>('en-IN');
   const [stage, setStage] = useState<Stage>('idle');
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingStartedAtRef = useRef(0);
+  const conversationEndRef = useRef<HTMLDivElement | null>(null);
+  const latestMessageRef = useRef<HTMLElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const busy = stage !== 'idle' && stage !== 'recording';
-  const selectedLanguage = LANGUAGES.find((language) => language.code === languageCode) ?? LANGUAGES[0];
+  const selectedLanguage = LANGUAGES.find((language) => language.code === languageCode) ?? LANGUAGES[0]!;
+
+  useEffect(() => {
+    const latestMessage = messages[messages.length - 1];
+    if (latestMessage?.role === 'agent' && latestMessage.id !== 'welcome') {
+      latestMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages]);
+
+  useEffect(() => {
+    if (stage === 'thinking' || stage === 'transcribing') {
+      conversationEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [stage]);
+
+  useEffect((): (() => void) => (): void => {
+    if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const playAudio = async (audioDataUrl: string): Promise<void> => {
     try {
@@ -115,20 +182,33 @@ export function VoiceOrderConsole(): ReactNode {
         body: JSON.stringify({ message: cleanMessage, languageCode: requestedLanguage }),
       });
       const agentMessageId = createId();
+      const displayText = stripFactMarkers(chat.reply);
+      const richContent = hasRichMessageContent(displayText);
       setMessages((current) => [
         ...current,
-        { id: agentMessageId, role: 'agent', text: stripFactMarkers(chat.reply) },
+        {
+          id: agentMessageId,
+          role: 'agent',
+          text: displayText,
+          ...(chat.shareUrl ? { shareUrl: chat.shareUrl } : {}),
+        },
       ]);
-      setStage('speaking');
+      const speakableText = extractSpeakableText(chat.reply);
+      if (!speakableText) return;
 
+      setStage('speaking');
       try {
         const speech = await requestJson<SpeakResponse>('/api/voice/speak', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text: chat.reply, languageCode: requestedLanguage }),
+          body: JSON.stringify({ text: speakableText, languageCode: requestedLanguage }),
         });
         setMessages((current) => current.map((item) => item.id === agentMessageId
-          ? { ...item, text: speech.localizedText, audioDataUrl: speech.audioDataUrl }
+          ? {
+            ...item,
+            ...(richContent ? {} : { text: speech.localizedText }),
+            audioDataUrl: speech.audioDataUrl,
+          }
           : item));
         await playAudio(speech.audioDataUrl);
       } catch (speechError) {
@@ -163,6 +243,12 @@ export function VoiceOrderConsole(): ReactNode {
 
   const toggleRecording = async (): Promise<void> => {
     if (stage === 'recording') {
+      if (Date.now() - recordingStartedAtRef.current < MIN_RECORDING_MS) {
+        setError('Keep speaking for at least one second, then tap the microphone again.');
+        return;
+      }
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
       recorderRef.current?.stop();
       return;
     }
@@ -188,13 +274,25 @@ export function VoiceOrderConsole(): ReactNode {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = (): void => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+        const audioType = recorder.mimeType || chunksRef.current[0]?.type || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: audioType });
+        const durationMs = Date.now() - recordingStartedAtRef.current;
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         recorderRef.current = null;
+        recordingStartedAtRef.current = 0;
+        if (!recordingReadyForUpload(durationMs, blob.size)) {
+          setError('I could not hear enough audio. Hold the microphone and speak for at least two seconds.');
+          setStage('idle');
+          return;
+        }
         void handleVoiceBlob(blob);
       };
       recorder.start(250);
+      recordingStartedAtRef.current = Date.now();
+      recordingTimerRef.current = setTimeout(() => recorder.stop(), MAX_RECORDING_MS);
       setStage('recording');
     } catch {
       setError('Microphone access is unavailable. Allow access or type your request below.');
@@ -207,75 +305,130 @@ export function VoiceOrderConsole(): ReactNode {
     void sendMessage(input, languageCode);
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (input.trim() && !busy && stage !== 'recording') void sendMessage(input, languageCode);
+    }
+  };
+
   return (
     <main className="app-shell">
       <div className="paper-noise" />
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="JaldiAI Voice home">
+        <a className="brand" href="#conversation" aria-label="JaldiAI home">
           <span className="brand-mark"><SparkIcon /></span>
           <span>Jaldi<span>AI</span></span>
         </a>
         <div className="topbar-note">
           <span className="status-dot" />
-          Prepare-first mode
+          {publicCartHandoff ? 'Shared cart access · COD off' : 'Private family access'}
         </div>
-        <div className="edition">Sarvam Epoch · Builder Edition</div>
+        <div className="edition">Sarvam voice · Hermes intelligence</div>
       </header>
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="eyebrow">Your language. Your errands. Your control.</p>
-          <h1>Speak it.<br /><em>Review it.</em><br />Get it done.</h1>
-          <p className="hero-description">
-            A voice-first personal operations layer for India—built to understand the language you
-            live in, and careful enough to show every rupee before acting.
-          </p>
-        </div>
-
-        <div className="voice-stage" aria-live="polite">
-          <div className={`sound-orbit ${stage === 'recording' ? 'is-recording' : ''}`}>
-            <span /><span /><span />
-            <button
-              className="voice-button"
-              type="button"
-              onClick={() => void toggleRecording()}
-              disabled={busy}
-              aria-label={stage === 'recording' ? 'Stop recording' : 'Start voice recording'}
-            >
-              <VoiceIcon />
-              <strong>{stage === 'recording' ? 'Finish' : 'Speak'}</strong>
-            </button>
+      <section className="workspace" aria-label="JaldiAI chat">
+        <aside className="intro-panel">
+          <div className="intro-copy">
+            <p className="eyebrow">Your language. Your errands. Your control.</p>
+            <h1>Say it.<br /><em>See it.</em><br />Stay in control.</h1>
+            <p>
+              {publicCartHandoff
+                ? 'Speak naturally or type. JaldiAI can search and build a cart, then give you an official Blinkit share link to open on your own device.'
+                : 'Speak naturally or type. JaldiAI can search, prepare, compare, and check status while keeping exact prices, addresses, ETAs, and final actions visible.'}
+            </p>
           </div>
-          <p className="stage-label">{STAGE_LABELS[stage]}</p>
-          <p className="language-hint">Auto-detects 22 Indian languages</p>
-        </div>
-      </section>
 
-      <section className="workspace" aria-label="Voice errand workspace">
-        <div className="conversation-column">
-          <div className="language-strip" aria-label="Response language">
-            <span>Try it in</span>
-            <div>
-              {LANGUAGES.map((language) => (
-                <button
-                  key={language.code}
-                  className={language.code === languageCode ? 'is-selected' : ''}
-                  type="button"
-                  onClick={() => setLanguageCode(language.code)}
-                  disabled={busy || stage === 'recording'}
-                  title={language.label}
-                >
-                  {language.nativeLabel}
-                </button>
-              ))}
+          <div className="voice-stage" aria-live="polite">
+            <div className={`sound-orbit ${stage === 'recording' ? 'is-recording' : ''}`}>
+              <span /><span /><span />
+              <button
+                className="voice-button"
+                type="button"
+                onClick={() => void toggleRecording()}
+                disabled={busy}
+                aria-label={stage === 'recording' ? 'Stop recording' : 'Start voice recording'}
+              >
+                <VoiceIcon />
+                <strong>{stage === 'recording' ? 'Finish' : 'Speak'}</strong>
+              </button>
             </div>
+            <p className="stage-label">{STAGE_LABELS[stage]}</p>
+            <p className="language-hint">Sarvam auto-detects your spoken language</p>
           </div>
+
+          <div className="trust-note">
+            <span>01</span>
+            <p>{publicCartHandoff
+              ? <><strong>Cart links only.</strong> This shared account cannot place COD orders.</>
+              : <><strong>Exact terms first.</strong> Nothing final happens without a clear review and authorization.</>}</p>
+          </div>
+        </aside>
+
+        <section className="conversation-column" id="conversation">
+          <header className="conversation-header">
+            <div>
+              <span className="status-dot" />
+              <div>
+                <strong>JaldiAI</strong>
+                <p>{STAGE_LABELS[stage]}</p>
+              </div>
+            </div>
+            <label className="language-select">
+              <span>Reply in</span>
+              <select
+                value={languageCode}
+                onChange={(event) => setLanguageCode(event.target.value as SupportedLanguageCode)}
+                disabled={busy || stage === 'recording'}
+                aria-label="Response language"
+              >
+                {LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.nativeLabel} · {language.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronIcon />
+            </label>
+          </header>
 
           <div className="conversation" aria-live="polite">
-            {messages.map((message) => (
-              <article key={message.id} className={`message message-${message.role}`}>
+            {publicCartHandoff ? (
+              <aside className="account-notice" aria-label="Shared account limits">
+                <div>
+                  <span>Shared Suraj account</span>
+                  <strong>Search → build cart → share link. That’s the limit.</strong>
+                </div>
+                <p>
+                  COD and checkout are disabled. For COD access or your own MCP server and setup,
+                  contact <a href="https://sk9261712674.com" target="_blank" rel="noopener noreferrer">Suraj</a>.
+                </p>
+              </aside>
+            ) : null}
+            {messages.map((message, index) => (
+              <article
+                key={message.id}
+                ref={index === messages.length - 1 ? latestMessageRef : undefined}
+                className={`message message-${message.role}`}
+              >
                 <div className="message-meta">{message.role === 'agent' ? 'JaldiAI' : 'You'}</div>
-                <p>{message.text}</p>
+                {message.role === 'agent'
+                  ? <MessageContent content={message.text} />
+                  : <p>{message.text}</p>}
+                {message.shareUrl ? (
+                  <div className="handoff-card">
+                    <p>Cart handoff ready</p>
+                    <a
+                      className="handoff-button"
+                      href={message.shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span>Open in Blinkit</span><HandoffIcon />
+                    </a>
+                    <small>Blinkit will recheck your location, prices and delivery terms before checkout.</small>
+                  </div>
+                ) : null}
                 {message.audioDataUrl ? (
                   <button
                     className="listen-button"
@@ -290,47 +443,54 @@ export function VoiceOrderConsole(): ReactNode {
             {busy ? (
               <div className="thinking-line"><span /><span /><span />{STAGE_LABELS[stage]}</div>
             ) : null}
+            <div ref={conversationEndRef} />
           </div>
 
           {error ? <div className="error-note" role="alert">{error}</div> : null}
 
           <form className="composer" onSubmit={submitText}>
-            <label htmlFor="errand-request">Or type your request</label>
             <div className="composer-row">
-              <input
+              <button
+                className={`composer-voice ${stage === 'recording' ? 'is-recording' : ''}`}
+                type="button"
+                onClick={() => void toggleRecording()}
+                disabled={busy}
+                aria-label={stage === 'recording' ? 'Stop recording' : 'Record a voice request'}
+                title={stage === 'recording' ? 'Finish recording' : 'Speak'}
+              >
+                <VoiceIcon />
+              </button>
+              <textarea
+                ref={textareaRef}
                 id="errand-request"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder={selectedLanguage?.sample ?? 'Tell me what you need'}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={stage === 'recording' ? 'Listening…' : selectedLanguage.sample}
                 disabled={busy || stage === 'recording'}
                 autoComplete="off"
+                rows={1}
+                aria-label="Type your errand request"
               />
-              <button type="submit" disabled={busy || stage === 'recording' || input.trim().length === 0}>
+              <button
+                className="send-button"
+                type="submit"
+                disabled={busy || stage === 'recording' || input.trim().length === 0}
+                aria-label="Send message"
+              >
                 <span>Send</span><ArrowIcon />
               </button>
             </div>
+            <p>Enter to send · Shift + Enter for a new line</p>
           </form>
-        </div>
-
-        <aside className="trust-rail">
-          <div className="rail-number">03</div>
-          <p className="rail-kicker">Built for trust</p>
-          <h2>Nothing moves<br />without you.</h2>
-          <ol>
-            <li><span>01</span><div><strong>Speak naturally</strong><p>Sarvam hears native and code-mixed speech.</p></div></li>
-            <li><span>02</span><div><strong>Review exact terms</strong><p>Prices, quantities and delivery details stay unchanged.</p></div></li>
-            <li><span>03</span><div><strong>Confirm explicitly</strong><p>Preparation is not an order. You make the final call.</p></div></li>
-          </ol>
-          <div className="safety-stamp">
-            <SparkIcon />
-            <span>Powered by Sarvam<br />Orchestrated by Hermes</span>
-          </div>
-        </aside>
+        </section>
       </section>
 
       <footer>
-        <p>JaldiAI · Personal operations, in your own words.</p>
-        <p>Live purchase actions remain protected by separate safety gates.</p>
+        <p>JaldiAI · Personal errands, in your own words.</p>
+        <p>{publicCartHandoff ? (
+          <>Shared-account mode creates cart links only. <a href="https://sk9261712674.com">Contact Suraj</a> for COD or a private setup.</>
+        ) : 'Paid actions remain behind exact-term review and authorization.'}</p>
       </footer>
     </main>
   );

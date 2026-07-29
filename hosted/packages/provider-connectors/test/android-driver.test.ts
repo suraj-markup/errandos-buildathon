@@ -41,6 +41,17 @@ const expectedOrder = {
   },
 };
 
+const deliveredOrderSource = [
+  '<hierarchy>',
+  '<node text="Order arrived 4 minutes early"/>',
+  '<node text="How was your order experience?"/>',
+  '<node text="Rate now"/>',
+  '<node text="Your delivery details"/>',
+  '<node text="Details of your current order"/>',
+  '<node text="Delivery at Home"/>',
+  '</hierarchy>',
+].join('');
+
 const liveCartSource = (lines: readonly { name: string; quantity: number; unitPrice: number }[]): string => [
   '<hierarchy>',
   `<node text="Shipment of ${lines.length} items" resource-id="com.grofers.customerapp:id/subtitle"/>`,
@@ -1981,6 +1992,53 @@ describe('Blinkit Android driver', () => {
 
     ui.sourceValue = '<hierarchy><node text="Order is confirmed"/></hierarchy>';
     expect(await new BlinkitAndroidDriver(ui).readConfirmation()).toEqual({ status: 'unverified' });
+  });
+
+  it('recognizes a delivered current-order detail screen and derives an opaque proposal-bound reference', async () => {
+    const ui = new FakeUi();
+    ui.sourceValue = deliveredOrderSource;
+    const driver = new BlinkitAndroidDriver(ui);
+
+    await expect(driver.currentScreen()).resolves.toMatchObject({
+      kind: 'order_confirmation',
+      searchAction: 'recoverable',
+    });
+    await expect(driver.readConfirmation(expectedOrder, new Date('2026-07-20T10:02:00.000Z')))
+      .resolves.toMatchObject({
+        status: 'committed',
+        providerReference: expect.stringMatching(/^order_[a-f0-9]{32}$/),
+      });
+  });
+
+  it('reconciles the delivered current-order detail without navigating or repeating the final action', async () => {
+    const ui = new FakeUi();
+    ui.sourceValue = deliveredOrderSource;
+    const orders = await new BlinkitAndroidDriver(ui).readOrderHistory(
+      expectedOrder,
+      new Date('2026-07-20T10:02:00.000Z'),
+    );
+
+    expect(orders).toEqual([expect.objectContaining({
+      providerReference: expect.stringMatching(/^order_[a-f0-9]{32}$/),
+      orderedAt: '2026-07-20T10:02:00.000Z',
+      checkout: expectedOrder.checkout,
+    })]);
+    expect(ui.operations).toEqual([]);
+    expect(ui.clickedTexts).not.toContain('Place Order');
+  });
+
+  it('does not reconcile a delivered detail screen for a different saved-address label', async () => {
+    const ui = new FakeUi();
+    ui.sourceValue = deliveredOrderSource;
+    const otherAddress = {
+      ...expectedOrder,
+      checkout: { ...expectedOrder.checkout, addressLabel: 'Work' },
+    };
+
+    await expect(new BlinkitAndroidDriver(ui).readConfirmation(
+      otherAddress,
+      new Date('2026-07-20T10:02:00.000Z'),
+    )).resolves.toEqual({ status: 'unverified' });
   });
 
   it('reconciles only a uniquely fingerprinted order-history record', async () => {

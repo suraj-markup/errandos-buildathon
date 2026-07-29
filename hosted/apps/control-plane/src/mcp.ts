@@ -123,7 +123,15 @@ export const CANONICAL_ERRAND_MCP_TOOL_NAMES = new Set<string>([
  'rapido_recent_trips',
  'rapido_resend_otp',
 ]);
-export interface McpServerOptions { canonicalOnly?: boolean }
+export const PUBLIC_CART_MCP_TOOL_NAMES = new Set<string>([
+ 'blinkit_search_products',
+ 'blinkit_readiness',
+ 'blinkit_clear_cart',
+ 'blinkit_add_cart_item',
+ 'blinkit_current_screen',
+ 'blinkit_share_cart',
+]);
+export interface McpServerOptions { canonicalOnly?: boolean; allowedToolNames?: ReadonlySet<string> }
 export interface McpAuthHandlers{status(p:PrincipalId,i:unknown):Promise<ProviderAuthStatusOutput>;begin(p:PrincipalId,i:unknown):Promise<ProviderBeginLoginOutput>;submitOtp(p:PrincipalId,i:unknown):Promise<ProviderSubmitOtpOutput>;resendOtp?(p:PrincipalId,i:unknown):Promise<ProviderBeginLoginOutput>}
 export interface McpProductSearchHandler{search(i:unknown):Promise<ProductSearchOutput>}
 export interface McpBlinkitSearchHandler{search(i:unknown):Promise<BlinkitSearchProductsOutputV1>}
@@ -137,10 +145,10 @@ const unavailableTx:McpTransactionHandlers={prepareGrocery:async()=>{throw new E
 export function createMcpServer(auth:McpAuthHandlers=unavailable,principalId='local-hermes' as PrincipalId,search:McpProductSearchHandler=unavailableSearch,tx:McpTransactionHandlers=unavailableTx,ready:()=>Promise<boolean>=async()=>true,blinkitSearch:McpBlinkitSearchHandler=unavailableBlinkitSearch,blinkitOperations:McpBlinkitOperationHandlers=unavailableBlinkitOperations,options:McpServerOptions={}){
  const server=new McpServer({name:'errandos',version:'0.4.0'});const result=<T extends object>(structuredContent:T)=>({content:[{type:'text' as const,text:JSON.stringify(structuredContent)}],structuredContent});
  const prepareBlinkit=async(action:()=>Promise<ProposalOutput>):Promise<BlinkitPrepareCodOrderOutputV1>=>{try{return BlinkitPrepareCodOrderOutputSchemaV1.parse(await action());}catch(error){const blocked=classifyBlinkitBlockedResult(error);if(blocked)return blocked;throw error;}};
- const reg=(idx:number,inputSchema:ZodRawShape,outputSchema:ZodRawShape,fn:(i:unknown)=>Promise<object>)=>{const t=ERRAND_MCP_TOOLS[idx]!;if(options.canonicalOnly&&!CANONICAL_ERRAND_MCP_TOOL_NAMES.has(t.name))return;
+ const reg=(idx:number,inputSchema:ZodRawShape,outputSchema:ZodRawShape,fn:(i:unknown)=>Promise<object>)=>{const t=ERRAND_MCP_TOOLS[idx]!;if(options.canonicalOnly&&!CANONICAL_ERRAND_MCP_TOOL_NAMES.has(t.name))return;if(options.allowedToolNames&&!options.allowedToolNames.has(t.name))return;
  const blinkitTool=t.name.startsWith('blinkit_');const rapidoTool=t.name.startsWith('rapido_');const registeredOutput=blinkitTool?blinkitToolOutputShape(outputSchema):rapidoTool?rapidoToolOutputShape(outputSchema):outputSchema;
  // The dynamic wrapper keeps every registered schema concrete while avoiding duplicated tool boilerplate.
- server.registerTool(t.name,{description:t.description,annotations:t.annotations,inputSchema,outputSchema:registeredOutput},async i=>{try{return result(z.object(outputSchema).parse(await fn(i)));}catch(error){if(blinkitTool)return result(classifyBlinkitToolFailure(error));if(rapidoTool)return result(classifyRapidoToolFailure(error));const code=error instanceof AndroidWorkerOperationError?error.stage:error instanceof AndroidWorkerClientError?error.code:'operation_failed';throw new Error(`JaldiAI operation failed: ${code}`);}})};
+ server.registerTool(t.name,{description:t.description,annotations:t.annotations,inputSchema,outputSchema:registeredOutput},async i=>{try{return result(z.object(outputSchema).parse(await fn(i)));}catch(error){if(blinkitTool)return result(classifyBlinkitToolFailure(error));if(rapidoTool)return result(classifyRapidoToolFailure(error));const code=error instanceof AndroidWorkerOperationError?error.stage:error instanceof AndroidWorkerClientError?error.code:'operation_failed';throw new Error(`ErrandOS operation failed: ${code}`);}})};
  reg(0,HealthInputSchema.shape,HealthOutputSchema.shape,async()=>{if(!await ready())throw new Error('PostgreSQL readiness failed');return({service:'errandos-control-plane',status:'ok'} satisfies HealthOutput)});
  reg(1,ProviderAuthStatusInputSchemaV1.shape,ProviderAuthStatusOutputSchemaV1.shape,i=>auth.status(principalId,i));reg(2,ProviderBeginLoginInputSchemaV1.shape,ProviderBeginLoginOutputSchemaV1.shape,i=>auth.begin(principalId,i));reg(3,ProductSearchInputSchemaV1.shape,ProductSearchOutputSchemaV1.shape,i=>search.search(i));
  reg(4,PrepareGroceryInputSchemaV1.shape,ProposalOutputSchemaV1.shape,i=>tx.prepareGrocery(principalId,i));reg(5,ProposalRefInputSchemaV1.shape,ProposalOutputSchemaV1.shape,i=>tx.status(principalId,i));reg(6,CommitInputSchemaV1.shape,CommitOutputObjectSchemaV1.shape,async i=>CommitOutputSchemaV1.parse(await tx.commit(principalId,i)));reg(7,ProposalRefInputSchemaV1.shape,CommitOutputObjectSchemaV1.shape,async i=>CommitOutputSchemaV1.parse(await tx.reconcile(principalId,i)));reg(8,ProviderSubmitOtpInputSchemaV1.shape,ProviderSubmitOtpOutputSchemaV1.shape,i=>auth.submitOtp(principalId,i));reg(9,PlaceCodOrderInputSchemaV1.shape,CommitOutputObjectSchemaV1.shape,async i=>CommitOutputSchemaV1.parse(await tx.placeCodOrder(principalId,i)));
@@ -220,7 +228,8 @@ export async function runMcpServer(dependencies:McpStartupDependencies={}):Promi
   const baseUrl=environment['PRODUCT_SEARCH_BASE_URL'];const search=baseUrl?new BrowserAutomationProductSearchConnector({baseUrl,timeoutMs:parseTimeout(environment['PRODUCT_SEARCH_TIMEOUT_MS'])}):unavailableSearch;
   const principal=(environment['ERRANDOS_PRINCIPAL_ID']??'local-hermes') as PrincipalId;
   runtime=createTransactionRuntime(database,environment);
-  server=createMcpServer(runtime?.auth??unavailable,principal,search,runtime?.tx??unavailableTx,database?()=>database!.ready():async()=>true,runtime?.blinkitSearch??unavailableBlinkitSearch,runtime?.blinkitOperations??unavailableBlinkitOperations,{canonicalOnly:environment['ERRANDOS_MCP_LEGACY_TOOLS']!=='true'});
+  const publicCartSurface=environment['ERRANDOS_MCP_SURFACE']==='public-cart';
+  server=createMcpServer(runtime?.auth??unavailable,principal,search,runtime?.tx??unavailableTx,database?()=>database!.ready():async()=>true,runtime?.blinkitSearch??unavailableBlinkitSearch,runtime?.blinkitOperations??unavailableBlinkitOperations,{canonicalOnly:environment['ERRANDOS_MCP_LEGACY_TOOLS']!=='true',...(publicCartSurface?{allowedToolNames:PUBLIC_CART_MCP_TOOL_NAMES}:{})});
   process.once('SIGINT',onSigint);process.once('SIGTERM',onSigterm);
   await server.connect((dependencies.transport??(()=>new StdioServerTransport()))());started=true;
  } finally {

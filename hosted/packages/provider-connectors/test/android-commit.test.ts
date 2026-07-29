@@ -132,6 +132,26 @@ describe('Android Blinkit final action', () => {
     expect(reads).toBe(1);
   });
 
+  it('promotes an ambiguous dispatch to committed only after reconciliation supplies a reference', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'errandos-android-reconcile-'));
+    const store = new FileAndroidCommitStore(root);
+    const keyHash = createHash('sha256').update(expected.idempotencyKey).digest('hex');
+    await store.recordDispatch({
+      idempotencyKeyHash: keyHash,
+      proposalHash: expected.proposalHash,
+      providerFingerprint: checkout.providerFingerprint,
+      state: 'dispatching',
+      dispatchedAt: '2026-07-19T10:01:00.000Z',
+    });
+    await store.recordOutcome(expected.idempotencyKey, 'ambiguous');
+    await store.recordOutcome(expected.idempotencyKey, 'committed', 'order-reconciled');
+
+    await expect(store.get(expected.idempotencyKey)).resolves.toMatchObject({
+      state: 'committed',
+      providerReference: 'order-reconciled',
+    });
+  });
+
   it('keeps reconciliation pending when matching history is not unique', async () => {
     const candidate = { providerReference: 'order-1', orderedAt: '2026-07-19T10:02:00.000Z', checkout };
     expect(await reconcileFromOrderHistory(expected, { readOrders: async () => [candidate, { ...candidate, providerReference: 'order-2' }] }))

@@ -24,6 +24,25 @@ describe('deployment environment validation', () => {
     })).not.toThrow();
   });
 
+  it('keeps the public cart surface incapable of paid actions', () => {
+    expect(() => validateDeploymentEnvironment({
+      ERRANDOS_MCP_SURFACE: 'public-cart',
+      ERRANDOS_LIVE_COMMIT: 'false',
+      ERRANDOS_TRUSTED_AUTONOMOUS_COD: 'false',
+    })).not.toThrow();
+    expect(() => validateDeploymentEnvironment({
+      ERRANDOS_MCP_SURFACE: 'public-cart',
+      ERRANDOS_LIVE_COMMIT: 'true',
+    })).toThrow('forbids every live commit');
+    expect(() => validateDeploymentEnvironment({
+      ERRANDOS_MCP_SURFACE: 'public-cart',
+      ERRANDOS_TRUSTED_AUTONOMOUS_COD: 'true',
+    })).toThrow('forbids every live commit');
+    expect(() => validateDeploymentEnvironment({
+      ERRANDOS_MCP_SURFACE: 'owner',
+    })).toThrow('must be public-cart');
+  });
+
   it('requires pinned private SSH worker configuration for Android Blinkit', () => {
     expect(() => validateDeploymentEnvironment({ ERRANDOS_BLINKIT_EXECUTION: 'android' })).toThrow('ERRANDOS_ANDROID_WORKER_SSH_HOST');
     expect(() => validateDeploymentEnvironment({

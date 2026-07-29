@@ -1,18 +1,18 @@
 # Sarvam + Hermes voice interface
 
-JaldiAI Voice adds a multilingual speech boundary around the existing Hermes-to-JaldiAI flow:
+ErrandOS Voice adds a multilingual speech boundary around the existing Hermes-to-ErrandOS flow:
 
 ```text
 Browser microphone
   -> Sarvam Saaras v3 (speech to English + detected language)
-  -> Hermes API server (conversation, clarification, JaldiAI skill)
-  -> JaldiAI typed MCP tools (search, prepare, status, guarded commit)
+  -> Hermes API server (conversation, clarification, ErrandOS skill)
+  -> ErrandOS typed MCP tools (search, prepare, status, guarded commit)
   -> Hermes response with immutable facts marked
   -> Sarvam Translate (prose only) + Bulbul v3 (speech)
   -> localized text and audio in the browser
 ```
 
-Sarvam does not receive provider sessions, Android state, proposal capabilities, cookies, or raw JaldiAI tools. Hermes remains the intelligence layer. JaldiAI remains the transaction authority.
+Sarvam does not receive provider sessions, Android state, proposal capabilities, cookies, or raw ErrandOS tools. Hermes remains the intelligence layer. ErrandOS remains the transaction authority.
 
 ## 1. Configure Hermes
 
@@ -80,7 +80,7 @@ ERRANDOS_LIVE_BROWSER_ACTIONS=false
 ERRANDOS_LIVE_COMMIT=false
 ```
 
-Voice input is not itself a commit capability. Hermes must prepare and render the exact proposal, state that nothing has been ordered, and wait for explicit confirmation of those terms. JaldiAI still enforces proposal ownership, proposal hashes, idempotency, exact-term revalidation, at-most-once final action, and read-only reconciliation.
+Voice input is not itself a commit capability. Hermes must prepare and render the exact proposal, state that nothing has been ordered, and wait for explicit confirmation of those terms. ErrandOS still enforces proposal ownership, proposal hashes, idempotency, exact-term revalidation, at-most-once final action, and read-only reconciliation.
 
 Do not ask users to speak phone numbers or OTPs into the Sarvam voice path. Use the private typed login flow and never echo or persist those values.
 
@@ -97,10 +97,10 @@ pnpm --filter @errandos/web build
 
 Before any live canary:
 
-1. Verify Hermes lists the JaldiAI MCP tools.
+1. Verify Hermes lists the ErrandOS MCP tools.
 2. Complete one search-only voice turn in each demo language.
 3. Complete a multi-turn product clarification.
-4. Prepare a cart and verify every displayed fact against JaldiAI output.
+4. Prepare a cart and verify every displayed fact against ErrandOS output.
 5. Confirm duplicate requests reuse one idempotency key.
 6. Confirm an ambiguous result reconciles read-only and never triggers another final action.
 7. Enable reversible actions only for a supervised test.
@@ -109,3 +109,54 @@ Before any live canary:
 ## Hackathon demo cut line
 
 The required demo is voice -> search -> exact prepared proposal -> localized playback. A live order is a stretch goal, not a requirement. Never substitute a fake success screen for a missing receipt.
+
+## Public cart-handoff mode
+
+The buildathon can also run as a directly usable public handoff without giving
+visitors access to the owner's login, addresses, order history, checkout, or
+final actions:
+
+```text
+Visitor voice
+  -> Sarvam Saaras v3
+  -> dedicated public Hermes profile
+  -> cart-only ErrandOS MCP surface
+  -> clear + search + add + native Blinkit share
+  -> validated Blinkit-domain URL
+  -> Sarvam localized response
+  -> visitor reviews and checks out in their own official Blinkit app
+```
+
+Use a separate Hermes profile with the MCP configuration in
+`hermes/mcp.public-cart.example.yaml`. Its MCP process must set:
+
+```text
+ERRANDOS_MCP_SURFACE=public-cart
+ERRANDOS_TRUSTED_AUTONOMOUS_COD=false
+ERRANDOS_LIVE_BROWSER_ACTIONS=true
+ERRANDOS_LIVE_COMMIT=false
+ERRANDOS_RAPIDO_LIVE_COMMIT=false
+```
+
+Point a separate web process at that Hermes API and enable:
+
+```text
+ERRANDOS_PUBLIC_CART_HANDOFF=true
+```
+
+Public turns are serialized inside one web process so the shared Android cart
+cannot be mutated by two web requests at once. Deploy this MVP as one web
+process and one public Hermes gateway; horizontal scaling requires a durable
+distributed queue. The public MCP allowlist contains only Blinkit readiness,
+search, clear, add, sanitized screen recovery, and native sharing.
+
+Use a dedicated public Android worker and cart-building provider account for an
+open deployment. Do not run owner operations against that worker while a
+public handoff is executing.
+The owner's personal provider account is acceptable only for a supervised,
+commit-disabled demonstration. Apply ingress authentication or rate limiting
+before sharing the URL broadly.
+
+The shared cart reflects the worker's store context. The visitor's official
+Blinkit app remains the source of truth for location-specific availability,
+prices, delivery terms, and checkout after opening the link.

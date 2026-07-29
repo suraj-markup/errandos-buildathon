@@ -4,7 +4,7 @@ This is the canonical owner-approved Step 1–8 sequence for the Blinkit Android
 
 ## Status tracker
 
-Last audited: 2026-07-25
+Last audited: 2026-07-26
 
 | Step | Status | Current evidence / remaining work |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Last audited: 2026-07-25
 | 2 — Cart editing tools | Implemented and real-cart tested | Exact opaque line IDs, quantity changes, removal, clearing, verified full-cart returns, and refreshed fingerprints are implemented. |
 | 3 — Checkout constraints | Live verified | Every listed provider constraint has a typed `blocked` contract. Through Hermes and the real Android worker, one ₹25 item returned exact ₹25/₹50 COD-minimum facts, while three ₹25 items returned an immutable COD proposal. |
 | 4 — Asynchronous Android operations | Live verified | Canonical start/status tools, owner-isolated durable records, per-account serialization, worker leases, and hard deadlines are implemented. Hermes completed a real 48-second preparation and recovered the same terminal proposal after a gateway restart. |
-| 5 — Addresses and order history | Live verified | `blinkit_list_saved_addresses` returns real labels with opaque references, and `blinkit_recent_orders` returns sanitized real order summaries through the normal Hermes MCP path. Unknown item quantities are omitted rather than invented. |
+| 5 — Addresses and order history | Live verified | Saved addresses and recent orders return sanitized provider facts. Delivered current-order detail screens are recognized and can reconcile only against the exact persisted dispatch window and saved-address label. |
 | 6 — Simplify the MCP surface | Live verified | Production advertises 24 canonical Blinkit tools while retaining legacy handlers behind an explicit compatibility option. VPC, Hermes chat, and an owner-originated Telegram request all worked through the focused surface. |
 | 7 — Update the Hermes skill | Live verified | The canonical-only skill is installed on Hermes, handles structured constraints and async terminal states, and successfully drove real readiness and final-canary turns without raw device fallbacks. |
 | 8 — Deployment and live verification | Live verified | The complete non-commit final canary passed through Hermes and the real Android worker, and the owner subsequently confirmed the deployed Telegram path works. |
@@ -168,12 +168,15 @@ Live verification evidence (2026-07-23):
 
 - The saved-address tool returned only real saved labels and opaque `addressReference` values through Hermes.
 - The recent-orders tool returned three real delivered-order summaries through Hermes → MCP → SSH/Tailscale → GCP worker → Appium → Blinkit.
-- The current Blinkit order-history list does not expose per-item quantities or a provider order ID. JaldiAI therefore omits unknown quantities and derives a stable opaque `orderReference` from the exact observed timestamp, total, and item names.
+- The current Blinkit order-history list does not expose per-item quantities or a provider order ID. ErrandOS therefore omits unknown quantities and derives a stable opaque `orderReference` from the exact observed timestamp, total, and item names.
 - Raw delivery addresses present on the provider screen were excluded by the parser and the strict MCP output contract.
 - No cart mutation, checkout preparation, final order action, or reconciliation action was performed during verification.
 - On 2026-07-26, the saved-address reader was hardened to scan up to 12 bounded address-book snapshots, deduplicate opaque references, stop on repeated content, and preserve label-only output. Focused tests cover discovering and selecting an off-screen `Work` entry while excluding its full address.
 - Initial live Hermes attempts returned only `Home` and `Rajneesh Yadav`; three bounded experimental fallbacks returned typed `provider_timeout` failures and were rolled back to the checksum-verified `970c808-address-scroll-on-rapido-unavailable-019f9b07` release.
 - After the owner closed and restarted Blinkit to clear the stale provider UI operation, the normal Hermes path returned both `Work` and `Home`, selected `Home` using its exact opaque reference, and verified the resulting cart as empty. No cart item, checkout, payment, or order action was performed. This confirms saved-address enumeration and selection work on the stable release when the provider app is not stale.
+- A real final action on 2026-07-26 initially remained `ambiguous` because Blinkit exposed a delivered current-order detail page without a visible provider order ID. The adapter now recognizes that surface only from a conjunction of delivered/current-order/rating markers and requires the exact saved-address label plus the original persisted dispatch timestamp inside the immutable proposal window before deriving a stable opaque order reference.
+- The normal Hermes MCP path then returned `order_confirmation`; read-only reconciliation promoted the exact ambiguous proposal and its Android commit record to `committed`, produced a durable receipt, and set `reconciliationRequired: false`. A separate status read confirmed the committed proposal for the exact ₹196 Home COD terms. Reconciliation did not click or retry the final provider action.
+- The isolated Blinkit-only GCP runtime release for that live verification is `1b605ec4280a-postorder-3e8e93eb4025`. Provider and worker tests, typecheck, lint, and `git diff --check` passed before deployment.
 
 Estimated effort: 1 day.
 
@@ -283,16 +286,43 @@ The default sequence is Step 1, then Step 2, then Step 3, then Step 4, and so on
 
 ## Post-roadmap reliability hardening
 
+Public cart handoff (implemented locally 2026-07-28; live verification pending):
+
+- A separate `ERRANDOS_MCP_SURFACE=public-cart` allowlist advertises only
+  readiness, search, clear, add, sanitized screen recovery, and native cart
+  sharing. Login, addresses, order history, checkout preparation, proposal
+  status, reconciliation, and every final action are absent.
+- Deployment validation rejects live commit, Rapido commit, and autonomous COD
+  gates on this public surface.
+- The Sarvam web path serializes public Hermes turns in one process, extracts
+  only HTTPS Blinkit-domain share URLs, removes the raw URL from spoken prose,
+  and renders an `Open in Blinkit` handoff with an explicit provider recheck
+  notice.
+- Focused control-plane and web tests cover the allowlist, kill switches,
+  queue behavior after failure, prompt boundary, domain validation, and exact
+  fact-preserving voice behavior.
+- Remaining live evidence: run a dedicated public Hermes profile against a
+  dedicated cart-building provider account, complete one clear/search/add/share
+  turn from the mobile web interface, and open the returned link in a different
+  owner's official Blinkit app. Keep every final-action gate off.
+
 Screen diagnosis and search normalization (live verified 2026-07-24):
 
 - `blinkit_current_screen` reports only a strict semantic screen kind, whether search is available/recoverable/blocked, and optional safe product/cart facts.
-- The worker and MCP contracts reject screenshots, UI XML, selectors, coordinates, resource IDs, emulator details, and arbitrary device state.
+- The worker and MCP contracts reject screenshots, UI XML, selectors, coordinates, resource IDs, emulator details, and arbitrary device state. The owner-approved post-order evidence exception remains a separate restricted media path and never becomes a generic MCP screenshot tool.
 - Blinkit search now identifies a product-detail screen and uses its semantic Search or Navigate up control before continuing, instead of depending only on generic Android back behavior.
 - The Hermes skill diagnoses one failed search/add with the sanitized screen tool, retries the original semantic operation at most once on a known recoverable screen, and stops on blocked/unknown state.
 - From a real Blinkit product-detail screen, `blinkit_current_screen` returned the safe `product_detail` classification and exact safe catalog facts. A subsequent Diet Coke search recovered semantically and returned real search results without changing the cart.
-- Owner screenshot delivery remains outside MCP and is implemented as an owner-only Telegram `/screen` command backed by a separate restricted SSH identity. It permits only catalog/search/product-detail surfaces and refuses login, OTP, address, checkout, payment, order-history, confirmation, and unknown screens.
+- General owner screenshot delivery remains outside MCP and is implemented as an owner-only Telegram `/screen` command backed by a separate restricted SSH identity. That diagnostic command still permits only catalog/search/product-detail surfaces and refuses login, OTP, address, checkout, payment, order-history, confirmation, and unknown screens.
 - The production restricted capture returned a valid PNG from the real search-results screen, Hermes delivered it to the configured single-owner Telegram destination, and the gateway remained active with the owner-only command registration.
 - Local focused suites, full PostgreSQL-backed tests, typecheck, lint, build, skill validation, and `git diff --check` pass.
+
+Owner-only post-order visual evidence (owner approved 2026-07-26; implementation pending):
+
+- Personal deployments may enable `ERRANDOS_OWNER_ORDER_EVIDENCE=true` to send a raw Blinkit confirmation, tracking, or delivered screen to the single configured owner's private Telegram DM after a durable `committed` result with a verified provider reference.
+- The image is supporting evidence only and may not determine transaction success, amount, ETA, or provider reference.
+- The capture/send path stays outside MCP, uses a short-lived owner-only file, deletes it after delivery, and refuses login, OTP, password, payment-credential, bank-challenge, unverified-order, and group contexts.
+- The existing `/screen` diagnostic command remains restricted to safe catalog surfaces; post-order evidence uses a separate narrowly scoped helper.
 
 Native cart sharing (live verified 2026-07-24):
 
@@ -309,14 +339,14 @@ Typed tool recovery and proposal preflight (live verified 2026-07-24):
 - `blinkit_recent_operations` lists owner/account-isolated durable preparation operations so Hermes can recover an operation ID and terminal result after a process or conversation restart.
 - `blinkit_select_saved_address` selects an exact saved address by its opaque reference and confirms only the selected safe label. It deliberately returns `cartStatus: unverified`; the Hermes skill immediately follows with the separately bounded `blinkit_cart_status` call before making any cart claim.
 - `blinkit_compare_proposal` re-reads live cart/checkout terms and compares only allowlisted material fields against the immutable proposal. It never grants approval or attempts the final provider action.
-- Search results may include an optional provider-supplied HTTPS image URL only when it belongs to an allowlisted Blinkit/Grofers host. The absence of an image remains a valid result; JaldiAI never substitutes a screenshot or guessed image.
+- Search results may include an optional provider-supplied HTTPS image URL only when it belongs to an allowlisted Blinkit/Grofers host. The absence of an image remains a valid result; ErrandOS never substitutes a screenshot or guessed image.
 - Contracts and focused tests cover strict failure redaction, owner/account isolation, restart recovery, address-reference selection, unchanged/changed proposal comparisons, and image-host filtering.
 - The Hermes skill now treats structured `failed` results as reachable MCP responses, uses recent operations for recovery, requires an unchanged proposal comparison after owner confirmation and before placement, and renders optional trusted images without inventing them.
 - Every Appium HTTP request has its own sanitized 30-second deadline, below the outer worker deadline, so a single stalled UI call cannot consume an unbounded operation.
 - The real Hermes MCP path reported every readiness dependency ready, returned a valid empty recent-operation history, returned `proposal_not_found` as a typed non-retryable result for a deliberately unknown proposal, recovered product search from checkout, and listed saved addresses after semantic recovery from a product-detail screen.
 - Exact Home selection completed through its opaque address reference and returned `cartStatus: unverified`, after which the required separate cart read returned the live two-line/four-unit cart, ₹365 subtotal, Home, an eight-minute ETA, and a fresh provider fingerprint.
 - The live cart canary exposed redundant Appium element discovery on Home. The adapter now derives the exact semantic `View cart` target from one accessibility snapshot, keeps its geometry private, performs one bounded internal tap, and parses the verification snapshot without rediscovering the control. The production cart read completed in 23 seconds through Hermes's secure MCP entry.
-- JaldiAI prepared that existing cart as a fresh immutable ₹377 COD proposal without placing it. A subsequent read-only `blinkit_compare_proposal` re-read live provider terms and returned `unchanged`, no material changes, and a current provider fingerprint while the proposal remained `prepared`.
+- ErrandOS prepared that existing cart as a fresh immutable ₹377 COD proposal without placing it. A subsequent read-only `blinkit_compare_proposal` re-read live provider terms and returned `unchanged`, no material changes, and a current provider fingerprint while the proposal remained `prepared`.
 - The GCP Android worker and Hermes VPC both ran revision `a1d6259` for the final canary. Local full PostgreSQL-backed tests, typecheck, lint, build, skill validation, and `git diff --check` passed.
 - No commit tool, final order action, screenshot, raw UI state, or device command was used or exposed during this verification. Nothing was ordered.
 

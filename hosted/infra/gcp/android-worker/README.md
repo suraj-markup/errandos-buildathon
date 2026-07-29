@@ -1,4 +1,4 @@
-# JaldiAI GCP Android worker
+# ErrandOS GCP Android worker
 
 These scripts operate only on the owner-authorized existing project recorded in
 `$HOME/.local/state/errandos/gcp-android-worker.env`. Every mutating `gcloud`
@@ -30,10 +30,27 @@ host-local worker connection settings, writes the PNG to a private Hermes cache
 directory, validates the PNG signature, and prints only the absolute path so
 the Telegram gateway can deliver it as media. Restrict the corresponding
 `/screen` quick command to the single owner through Hermes slash-command access
-control. Never register this path as an JaldiAI MCP tool.
+control. Never register this path as an ErrandOS MCP tool.
 
 `infra/hermes/install-screen-command.py` adds the `/screen` quick command and
 enables slash-command gating. It refuses to proceed unless
 `TELEGRAM_ALLOWED_USERS` contains exactly one numeric owner ID, makes that owner
 the only DM slash-command administrator, makes that same owner the Telegram
 home channel for safe media delivery, and denies the command in groups.
+
+## Owner-only post-order evidence
+
+The safe `/screen` preview above remains intentionally limited. A separate
+post-order evidence path may send a raw Blinkit confirmation, tracking, or
+delivered screen only when all of the following are true:
+
+- `ERRANDOS_DEPLOYMENT_PROFILE=personal`
+- `ERRANDOS_OWNER_ORDER_EVIDENCE=true`
+- the durable proposal is `committed` and has a verified provider reference
+- the recipient is the single configured Telegram owner in a private DM
+
+This path may include the opted-in owner's address and masked contact details.
+It must refuse login, OTP, password, payment-credential, bank-challenge,
+unverified-order, and group contexts. Capture to a mode-`0600` temporary file,
+send it once, and delete it immediately afterward. Never register a generic
+screenshot, Appium, ADB, selector, coordinate, XML, or device-control MCP tool.

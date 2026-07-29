@@ -7,7 +7,7 @@ Call `blinkit_readiness` before the first provider operation in a conversation a
 - Continue only when the overall status is `ready`.
 - Run the typed private login flow when authentication is `login_required`.
 - Stop and explain the typed reason when status is `challenge_required`, `worker_unreachable`, or another component is `unavailable` or `unknown`.
-- Never diagnose by falling back to SSH, GCP, Appium, ADB, screenshots, coordinates, selectors, or UI XML.
+- Never diagnose by falling back to SSH, GCP, Appium, ADB, screenshots, coordinates, selectors, or UI XML. The owner-only post-order evidence helper is evidence delivery after verified commit, not a diagnostic fallback.
 
 ## Search
 
@@ -21,10 +21,10 @@ Use the returned opaque `offerId` to preserve the owner's exact selection. Copy 
 
 An offer can contain an optional provider-supplied `imageUrl`. Render it only with that exact offer when the interface supports images. Missing images are normal; never manufacture or scrape one.
 
-If search or incremental add fails before returning a verified result, call `blinkit_current_screen` once. It returns only a sanitized screen `kind`, whether search is `available`, `recoverable`, or `blocked`, and optional safe product/cart facts. It never returns a screenshot, UI tree, selector, coordinate, or device state.
+If search or incremental add fails before returning a verified result, call `blinkit_current_screen` once. It returns only a sanitized screen `kind`, whether search is `available`, `recoverable`, or `blocked`, and optional safe product/cart facts. It never returns a screenshot, UI tree, selector, coordinate, or device state. The dedicated owner-only post-order evidence helper is outside MCP and is allowed only after a durable committed order.
 
 - On `home`, `search`, or `search_results`, retry the original semantic operation once.
-- On a product-detail screen or another screen marked `recoverable`, retry the original semantic operation once; JaldiAI normalizes the app back to search internally.
+- On a product-detail screen or another screen marked `recoverable`, retry the original semantic operation once; ErrandOS normalizes the app back to search internally.
 - On `login` or `otp`, use the typed authentication flow.
 - On `unknown` or `blocked`, stop with `screen_blocked`.
 
@@ -42,7 +42,7 @@ To change the active provider location, call `blinkit_select_saved_address` with
 
 Call `blinkit_recent_orders` for order-history questions and before `blinkit_reconcile_order` after an ambiguous final action. Render only order reference, item names and quantities, total, timestamp, and provider status.
 
-A matching recent order is evidence that the provider has an order; do not call the place tool. No match is not evidence that placement failed. Continue with proposal-bound read-only reconciliation and never repeat the final action. Do not expose or request delivery-address details, screenshots, selectors, UI XML, or emulator state.
+A matching recent order is evidence that the provider has an order; do not call the place tool. No match is not evidence that placement failed. Continue with proposal-bound read-only reconciliation and never repeat the final action. Do not expose or request delivery-address details, screenshots, selectors, UI XML, or emulator state through MCP. A raw order image may be delivered only by the gated owner-only post-order evidence helper after a verified committed result.
 
 ## Add one exact product without replacing the cart
 
@@ -121,7 +121,7 @@ Inspect the cart first and stop if it is empty. Render the complete proposal, in
 
 Call `blinkit_place_cod_order` with the prepared `proposalId` and deterministic `idempotencyKey`. Do not call it for search-only or prepare-only language.
 
-Before the final action, JaldiAI revalidates products, quantities, prices, fees, total, address, payment mode, ETA, and provider fingerprint against the proposal. Changed terms produce `stale` and no click.
+Before the final action, ErrandOS revalidates products, quantities, prices, fees, total, address, payment mode, ETA, and provider fingerprint against the proposal. Changed terms produce `stale` and no click.
 
 After the owner confirms the rendered proposal, call `blinkit_compare_proposal` before placement. `unchanged` permits the existing proposal to proceed. `changed` or `expired` forbids placement and requires a fresh rendered proposal plus new confirmation. A comparison never authorizes or places an order.
 
@@ -134,4 +134,4 @@ Never place a proposal after its `expiresAt`. Prepare and render a fresh proposa
 - On `committed`, show the verified provider reference.
 - On a recoverable pre-dispatch failure, retry only the documented semantic operation. Never improvise raw device actions.
 
-Known location prompts, review prompts, and overlays are recovered inside JaldiAI. If bounded recovery returns `screen_blocked`, stop and report that safe category. Never reach for raw clicks, screenshots, coordinates, selectors, XML, Appium, or ADB.
+Known location prompts, review prompts, and overlays are recovered inside ErrandOS. If bounded recovery returns `screen_blocked`, stop and report that safe category. Never reach for raw clicks, screenshots, coordinates, selectors, XML, Appium, or ADB. The post-order evidence exception never authorizes recovery or device control.

@@ -4,6 +4,11 @@ export function detectBlinkitAndroidStage(source: string): BlinkitAndroidStage {
   const text = source.toLowerCase();
   if (text.includes('location permission not enabled') && text.includes('select location manually')) return 'location_permission';
   if (text.includes('not now') && text.includes('submit')) return 'review_prompt';
+  if (
+    (text.includes('order arrived') || text.includes('order delivered'))
+    && text.includes('details of your current order')
+    && (text.includes('how was your order experience') || text.includes('rate now'))
+  ) return 'confirmed';
   if (text.includes('order is confirmed') || text.includes('track order')) return 'confirmed';
   if (text.includes('cash on delivery') && text.includes('bill total')) return 'payment_sheet';
   if ((text.includes('place order') && (text.includes('pay using') || text.includes('delivering to')))

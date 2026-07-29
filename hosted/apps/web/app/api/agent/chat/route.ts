@@ -3,7 +3,9 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { apiError } from '../../../../lib/api-errors';
 import { ChatRequestSchema, type ApiErrorResponse, type ChatResponse } from '../../../../lib/api-contracts';
-import { createHermesClientFromEnv } from '../../../../lib/hermes';
+import { extractBlinkitHandoff } from '../../../../lib/blinkit-handoff';
+import { createHermesClientFromEnv, isPublicCartHandoffEnabled } from '../../../../lib/hermes';
+import { runPublicCartTurn } from '../../../../lib/public-cart-queue';
 
 export const runtime = 'nodejs';
 
@@ -22,13 +24,16 @@ export async function POST(request: Request): Promise<NextResponse<ChatResponse 
     const cookieStore = await cookies();
     const existingSessionId = cookieStore.get(SESSION_COOKIE)?.value;
     const sessionId = existingSessionId ?? randomUUID();
-    const reply = await createHermesClientFromEnv().chat(
+    const chat = (): Promise<string> => createHermesClientFromEnv().chat(
       parsed.data.message,
       parsed.data.languageCode,
       sessionId,
     );
+    const publicCartHandoff = isPublicCartHandoffEnabled();
+    const rawReply = publicCartHandoff ? await runPublicCartTurn(chat) : await chat();
+    const handoff = publicCartHandoff ? extractBlinkitHandoff(rawReply) : { reply: rawReply };
 
-    const response = NextResponse.json({ reply });
+    const response = NextResponse.json(handoff);
     if (!existingSessionId) {
       response.cookies.set(SESSION_COOKIE, sessionId, {
         httpOnly: true,

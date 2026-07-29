@@ -68,7 +68,9 @@ export class FileAndroidCommitStore implements AndroidCommitStore {
     const keyHash = hashIdempotencyKey(idempotencyKey);
     const existing = await this.readByHash(keyHash);
     if (!existing) throw new Error('Android commit_store_read failed');
-    if (existing.state === 'committed' || existing.state === 'ambiguous') return;
+    if (existing.state === 'committed') return;
+    if (existing.state === 'ambiguous' && state === 'ambiguous') return;
+    if (state === 'committed' && !providerReference) throw new Error('Android commit_store_write failed');
     const next: AndroidCommitRecord = { ...existing, state, ...(providerReference ? { providerReference } : {}) };
     const temporary = join(this.root, `.${keyHash}.${randomUUID()}.tmp`);
     try {

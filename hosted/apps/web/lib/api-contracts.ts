@@ -46,6 +46,7 @@ export interface TranscriptionResponse {
 
 export interface ChatResponse {
   reply: string;
+  shareUrl?: string;
 }
 
 export interface SpeakResponse {
